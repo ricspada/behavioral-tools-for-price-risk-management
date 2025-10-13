@@ -1,6 +1,6 @@
 ## This code is used to replicate the main results of Li and Chavas (2021)
 
-setwd("C:/Users/lijian/Desktop")
+# setwd("C:/Users/lijian/Desktop")
 
 library(quantreg)
 library(moments)
