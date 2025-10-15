@@ -1,10 +1,9 @@
 rm(list = ls()) # clean environment
 
 # Load required libraries
-library(terra)
-library(sf)
 library(tidyverse)
 library(readxl)
+library(stargazer)
 
 # Set seed for reproducibility
 set.seed(1234)
@@ -14,12 +13,35 @@ set.seed(1234)
 ################################################################################
 
 # 1.1 Get data from crop simulation model 
+sim_data <- read_csv("1_Data/RawData/EPIC2/Riccardo_EPIC.csv") 
 
+df <- sim_data |> 
+  filter(CROP == "WWHT", 
+         SimUID == 52338) # select only one grid location  
+  
 
-# 1.2 Just & Pope production function estimation 
+# 1.2 Just & Pope production function estimation
 
+reg_yield_function <- lmrob(YLD_DM ~ I(sqrt(FTN)) + FTN, data = df, method = "MM")
+summary(reg_yield_function)
 
+# append residuals to dataframe
+df <- df %>% 
+  mutate(residuals = reg_yield_function$residuals,
+         abs_residuals = abs(residuals))
 
+reg_variation_function <- lmrob(abs_residuals ~ I(sqrt(FTN)), 
+                                  data = df, method = "MM")
+summary(reg_variation_function)
+
+# summary table of regression results 
+stargazer(reg_yield_function, reg_variation_function,
+          type = "text",
+          title = "Yield and Variation Function Estimates",
+          dep.var.labels = c("Yield Function", "Variation Function"),
+          covariate.labels = c("sqrt(N)", "N", "Intercept"),
+          omit.stat = c("f", "ser"),
+          no.space = TRUE)
 
 ################################################################################
 # 2. NITROGEN PRICES - WHEAT PRICES RELATIONSHIP

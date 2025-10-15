@@ -10,7 +10,7 @@ library(tseries)
 library(forecast)
 
 #load and transform data ----
-dat <- read.csv("data.csv")
+dat <- read.csv("2_Scripts/example_code/QVAR_JP_paper/data.csv")
 yr  <- dat[,5]
 dat <- dat[,2:4]
 #transform data
