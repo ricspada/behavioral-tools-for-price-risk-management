@@ -19,16 +19,14 @@ df <- sim_data |>
   filter(CROP == "WWHT", 
          SimUID == 52338) # select only one grid location  
   
-
 # 1.2 Just & Pope production function estimation
 
 reg_yield_function <- lmrob(YLD_DM ~ I(sqrt(FTN)) + FTN, data = df, method = "MM")
 summary(reg_yield_function)
 
-# append residuals to dataframe
-df <- df %>% 
-  mutate(residuals = reg_yield_function$residuals,
-         abs_residuals = abs(residuals))
+# append absolute value of residuals to dataframe
+df <- df |> 
+  mutate(abs_residuals = abs(reg_yield_function$residuals))
 
 reg_variation_function <- lmrob(abs_residuals ~ I(sqrt(FTN)), 
                                   data = df, method = "MM")
