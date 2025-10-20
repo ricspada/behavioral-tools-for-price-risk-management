@@ -4,6 +4,7 @@ rm(list = ls()) # clean environment
 library(tidyverse)
 library(readxl)
 library(stargazer)
+library(zoo)
 
 # Set seed for reproducibility
 set.seed(1234)
@@ -70,9 +71,9 @@ stargazer(reg_yield_function, reg_variation_function,
 ### 2.1 Import Data ###############################################################
 
 ### Fertilizer prices 
-fert_df <- read_csv("1_Data/FertilizerPrices.csv")
+f_data <- read_csv("1_Data/FertilizerPrices.csv")
 
-ggplot(fert_df, aes(x = Date, color = Product, fill = Product)) +
+ggplot(f_data, aes(x = Date, color = Product, fill = Product)) +
   geom_ribbon(aes(ymin = Min_Price, ymax = Max_Price), alpha = 0.2, color = NA) +
   geom_line(aes(y = Avg_Price), linewidth = 0.8) +
   facet_wrap(~ Product, scales = "fixed", ncol = 3) +
@@ -82,9 +83,9 @@ ggplot(fert_df, aes(x = Date, color = Product, fill = Product)) +
   theme(legend.position = "none")
 
 ### Wheat prices 
-wheat_df <- read_csv("1_Data/Wheatprices.csv")
+w_data <- read_csv("1_Data/Wheatprices.csv")
 
-ggplot(crop_df, aes(x = Date, color = Product, fill = Product)) +
+ggplot(w_data, aes(x = Date, color = Product, fill = Product)) +
   geom_ribbon(aes(ymin = Min_Price, ymax = Max_Price), alpha = 0.2, color = NA) +
   geom_line(aes(y = Avg_Price), linewidth = 0.8) +
   scale_color_brewer(palette = "Dark2") +
@@ -95,8 +96,35 @@ ggplot(crop_df, aes(x = Date, color = Product, fill = Product)) +
   theme(legend.position = "bottom")
 
 ### 2.2 QVAR and copula
+f_data <- f_data[f_data[[2]] == "CAN", ] # Keep only CAN data
+w_data <- w_data[w_data[[2]] == "Bread_Wheat", ]
 
+# keep only common date datapoints
+dat <- inner_join(w_data, f_data, by = "Date")
 
+# Create variables
+nn <- nrow(dat)-1 #number of observations
+nL <- 4 # lags
+n <- nn-nL # trim for lags
+
+w_p <- dat[ ,5]
+w_p <- na.approx(dat[ ,5]) # Linear approximation of missing values (obs. 671 672 673 675 747)
+w_p1 <- dat[(nL-1):(nn-1), 5] #wheat lags
+w_p2 <- dat[(nL-2):(nn-2), 5]
+w_p3 <- dat[(nL-3):(nn-3), 5]
+w_p4 <- dat[(nL-4):(nn-4), 5]
+
+f_p <- dat[ ,9]
+f_p1 <- dat[(nL-1):(nn-1), 9] #fertilizer lags
+f_p2 <- dat[(nL-2):(nn-2), 9]
+f_p3 <- dat[(nL-3):(nn-3), 9]
+f_p4 <- dat[(nL-4):(nn-4), 9]
+
+yr <- dat[nL:nn, 1]
+
+# Combine data
+vardata <- cbind(w_p, f_p)
+View(vardata)
 
 ################################################################################
 # 3. ADJUSTED CONTRACT PRICING
