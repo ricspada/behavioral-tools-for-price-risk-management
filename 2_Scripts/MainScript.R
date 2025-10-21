@@ -1,10 +1,11 @@
 rm(list = ls()) # clean environment
 
 # Load required libraries
-library(tidyverse)
+library(quantreg)
 library(readxl)
 library(stargazer)
-library(zoo)
+library(tidyverse)
+library(vars)
 
 # Set seed for reproducibility
 set.seed(1234)
@@ -97,35 +98,69 @@ ggplot(w_data, aes(x = Date, color = Product, fill = Product)) +
 
 ### 2.2 QVAR and copula
 f_data <- f_data[f_data[[2]] == "CAN", ] # Keep only CAN data
-w_data <- w_data[w_data[[2]] == "Bread_Wheat", ]
+w_data <- w_data[w_data[[2]] == "Bread_Wheat", ] # alt. 'Feed_Wheat'
 
-# keep only common date datapoints
-dat <- inner_join(w_data, f_data, by = "Date")
+dat <- inner_join(w_data, f_data, by = "Date") # keep only 'common date'-datapoints
 
-# Create variables
-nn <- nrow(dat)-1 #number of observations
-nL <- 4 # lags
-n <- nn-nL # trim for lags
+dat <- dat %>%
+  rename(w_p = 5, f_p = 9) %>%
+  mutate(
+    w_p1 = lag(w_p, 1), # wheat lags
+    w_p2 = lag(w_p, 2),
+    w_p3 = lag(w_p, 3),
+    w_p4 = lag(w_p, 4),
+    f_p1 = lag(f_p, 1), # fert lags
+    f_p2 = lag(f_p, 2),
+    f_p3 = lag(f_p, 3),
+    f_p4 = lag(f_p, 4),
+    w_ps1 = w_p1^2,     # squares
+    f_ps1 = f_p1^2
+  ) %>% filter(!is.na(w_p4)) # remove NAs
 
-w_p <- dat[ ,5]
-w_p <- na.approx(dat[ ,5]) # Linear approximation of missing values (obs. 671 672 673 675 747)
-w_p1 <- dat[(nL-1):(nn-1), 5] #wheat lags
-w_p2 <- dat[(nL-2):(nn-2), 5]
-w_p3 <- dat[(nL-3):(nn-3), 5]
-w_p4 <- dat[(nL-4):(nn-4), 5]
+# VAR select
+vardat <- dat %>% dplyr::select(w_p, f_p)
+colnames(vardat) <- c("Wheat price", "Fertilizer price")
 
-f_p <- dat[ ,9]
-f_p1 <- dat[(nL-1):(nn-1), 9] #fertilizer lags
-f_p2 <- dat[(nL-2):(nn-2), 9]
-f_p3 <- dat[(nL-3):(nn-3), 9]
-f_p4 <- dat[(nL-4):(nn-4), 9]
+a <- VARselect(vardat, lag.max = 10, type = "const")
+a$selection #SC (BIC): 2 lags
+# summary(nvar <- VAR(vardat, p=2))
 
-yr <- dat[nL:nn, 1]
+# add exo variables
+VARselect(vardat, lag.max =4, exogen = cbind(dat$w_ps1))
+VARselect(vardat, lag.max =4, exogen = cbind(dat$f_ps1))
+VARselect(vardat, lag.max =4, exogen = cbind(dat$w_ps1, dat$w_ps1)) #SC: 2
 
-# Combine data
-vardata <- cbind(w_p, f_p)
-View(vardata)
+#marginal spec
+mw = w_p ~ w_p1 + f_p1 + w_p2 + f_p2 #wheat
+mf = f_p ~ w_p1 + f_p1 + w_p2 + f_p2 #fert
 
+#set quantiles
+taus <- c(.1, .3, .5, .7, .9)
+
+psu_r2s <- data.frame()
+rho <- function(u, tau) sum(u * (tau - (u < 0))) #rho calc from JP code
+
+for (tau in taus) {
+  fit <- rq(mw, tau = tau, data = dat) #fit the q reg for current tau
+  
+  y <- dat$w_p  #actual values
+  yhat <- predict(fit) #predicted by model
+  
+  # compute rho and rho0
+  rho <- rho(y - yhat, tau)
+  rho0  <- rho(y - quantile(y, probs = tau), tau)
+  
+  
+  r2 <- 1 - rho / rho0 #pseudo-R2
+  
+  psu_r2s <- rbind(psu_r2s, data.frame(tau = tau, pseudoR2 = r2)) #store
+}
+
+psu_r2s
+
+# QVARs
+rq(mw, tau = taus, data = dat)
+rq(mf, tau = taus, data = dat)
 ################################################################################
 # 3. ADJUSTED CONTRACT PRICING
 ################################################################################
