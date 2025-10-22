@@ -103,7 +103,7 @@ w_data <- w_data[w_data[[2]] == "Bread_Wheat", ] # alt. 'Feed_Wheat'
 dat <- inner_join(w_data, f_data, by = "Date") # keep only 'common date'-datapoints
 
 dat <- dat %>%
-  rename(w_p = 5, f_p = 9) %>%
+  rename(w_p = Avg_Price.x, f_p = Avg_Price.y) %>%
   mutate(
     w_p1 = lag(w_p, 1), # wheat lags
     w_p2 = lag(w_p, 2),
@@ -115,11 +115,10 @@ dat <- dat %>%
     f_p4 = lag(f_p, 4),
     w_ps1 = w_p1^2,     # squares
     f_ps1 = f_p1^2
-  ) %>% filter(!is.na(w_p4)) # remove NAs
+  ) %>% filter(!is.na(w_p4)) # remove NAs, only 2 lags are used -> over filtered?
 
 # VAR select
 vardat <- dat %>% dplyr::select(w_p, f_p)
-colnames(vardat) <- c("Wheat price", "Fertilizer price")
 
 a <- VARselect(vardat, lag.max = 10, type = "const")
 a$selection #SC (BIC): 2 lags
@@ -128,39 +127,82 @@ a$selection #SC (BIC): 2 lags
 # add exo variables
 VARselect(vardat, lag.max =4, exogen = cbind(dat$w_ps1))
 VARselect(vardat, lag.max =4, exogen = cbind(dat$f_ps1))
-VARselect(vardat, lag.max =4, exogen = cbind(dat$w_ps1, dat$w_ps1)) #SC: 2
+VARselect(vardat, lag.max =4, exogen = cbind(dat$w_ps1, dat$f_ps1)) #SC: 2
 
 #marginal spec
 mw = w_p ~ w_p1 + f_p1 + w_p2 + f_p2 #wheat
 mf = f_p ~ w_p1 + f_p1 + w_p2 + f_p2 #fert
 
-#set quantiles
-taus <- c(.1, .3, .5, .7, .9)
-
+#psuedo R2s
+taus_sparse <- c(.1, .3, .5, .7, .9)
 psu_r2s <- data.frame()
 rho <- function(u, tau) sum(u * (tau - (u < 0))) #rho calc from JP code
 
-for (tau in taus) {
+for (tau in taus_sparse) {
   fit <- rq(mw, tau = tau, data = dat) #fit the q reg for current tau
   
   y <- dat$w_p  #actual values
   yhat <- predict(fit) #predicted by model
   
   # compute rho and rho0
-  rho <- rho(y - yhat, tau)
+  rho_m <- rho(y - yhat, tau)
   rho0  <- rho(y - quantile(y, probs = tau), tau)
   
   
-  r2 <- 1 - rho / rho0 #pseudo-R2
+  r2 <- 1 - rho_m / rho0 #pseudo-R2
   
   psu_r2s <- rbind(psu_r2s, data.frame(tau = tau, pseudoR2 = r2)) #store
 }
-
 psu_r2s
 
 # QVARs
-rq(mw, tau = taus, data = dat)
-rq(mf, tau = taus, data = dat)
+taus_dense <- seq(0.01, 0.99, by = 0.01)
+fit_w <- rq(mw, tau = taus_dense, data = dat)
+fit_f <- rq(mf, tau = taus_dense, data = dat)
+coeff_w <- fit_w$coeff
+coeff_f <- fit_f$coeff
+
+# Independent variables
+w_p <- dat$w_p
+w_p1 <- dat$w_p1
+w_p2 <- dat$w_p2
+
+f_p <- dat$f_p
+f_p1 <- dat$f_p1
+f_p2 <- dat$f_p2
+
+X <- cbind(1, w_p1, f_p1, w_p2, f_p2) #col of 1s for b0
+
+# Inverse distributions
+y_w <- X %*% coeff_w
+y_w <- taus_dense(apply(y_w, 1, cummax))
+
+y_f <- X %*% coeff_f
+y_f <- taus_dense(apply(y_f, 1, cummax))
+
+# Copula
+n = nrow(vardat)
+
+F_w <- array(0, dim=c(n,1))
+F_f <- array(0, dim=c(n,1))
+
+for (ii in 1:n) {
+  F_w[ii] <- taus_dense[min(which(min(abs(w_p[ii] - y_w[ii,])) == abs(w_p[ii] - y_w[ii,])))]
+  F_f[ii] <- taus_dense[min(which(min(abs(f_p[ii] - y_f[ii,])) == abs(f_p[ii] - y_f[ii,])))]
+}
+
+C <- F_w ~ F_f
+summary(lm(C))
+rC <- rq(C, tau = taus_sparse)
+summary(rC, se = "boot", brmethod = "xy")
+rC_full <- rq(C, tau = taus_dense)
+coeff_rC <- rC_full$coeff
+
+plot(taus_dense, coeff_rC[2,], type="l", col="steelblue", lwd=2,
+     xlab="tau of fertilizer price",
+     ylab="slope")
+abline(h=0, lty=2)
+
 ################################################################################
 # 3. ADJUSTED CONTRACT PRICING
 ################################################################################
