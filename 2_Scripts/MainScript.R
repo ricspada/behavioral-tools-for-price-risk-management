@@ -4,6 +4,7 @@ rm(list = ls()) # clean environment
 library(quantreg)
 library(readxl)
 library(stargazer)
+library(robustbase)
 library(tidyverse)
 library(vars)
 
@@ -15,33 +16,9 @@ set.seed(1234)
 ################################################################################
 
 # 1.1 Get data from crop simulation model 
-sim_data <- read_csv("1_Data/RawData/EPIC2/Riccardo_EPIC.csv") 
-
-df <- sim_data |> 
-  filter(CROP == "WWHT", 
-         SimUID == 52338) # select only one grid location  
   
 # 1.2 Just & Pope production function estimation
 
-reg_yield_function <- lmrob(YLD_DM ~ I(sqrt(FTN)) + FTN, data = df, method = "MM")
-summary(reg_yield_function)
-
-# append absolute value of residuals to dataframe
-df <- df |> 
-  mutate(abs_residuals = abs(reg_yield_function$residuals))
-
-reg_variation_function <- lmrob(abs_residuals ~ I(sqrt(FTN)), 
-                                  data = df, method = "MM")
-summary(reg_variation_function)
-
-# summary table of regression results 
-stargazer(reg_yield_function, reg_variation_function,
-          type = "text",
-          title = "Yield and Variation Function Estimates",
-          dep.var.labels = c("Yield Function", "Variation Function"),
-          covariate.labels = c("sqrt(N)", "N", "Intercept"),
-          omit.stat = c("f", "ser"),
-          no.space = TRUE)
 
 ################################################################################
 # 2. NITROGEN PRICES - WHEAT PRICES RELATIONSHIP
@@ -175,10 +152,10 @@ X <- cbind(1, w_p1, f_p1, w_p2, f_p2) #col of 1s for b0
 
 # Inverse distributions
 y_w <- X %*% coeff_w
-y_w <- taus_dense(apply(y_w, 1, cummax))
+y_w <- t(apply(y_w, 1, cummax))
 
 y_f <- X %*% coeff_f
-y_f <- taus_dense(apply(y_f, 1, cummax))
+y_f <- t(apply(y_f, 1, cummax))
 
 # Copula
 n = nrow(vardat)
@@ -212,7 +189,7 @@ abline(h=0, lty=2)
 
 
 ################################################################################
-# 4. MONTE CARLO SIMULATION OF UTILITY FUNCTIONS
+# 4. MONTE CARLO SIMULATION OF UTILITY OF PROFITS FUNCTIONS
 ################################################################################
 
 ### 4.1 Broad framing ###########################################################
@@ -234,6 +211,5 @@ abline(h=0, lty=2)
 
 
 
-################################################################################
-# END OF SCRIPT
-################################################################################
+
+
