@@ -27,7 +27,7 @@ CRS4	crop rotation #4
 CRS5	crop rotation #5
 CRS6	crop rotation #6
 CRS7	crop rotation #7
-MONO	nonocrop
+MONO	monocrop
 
 FER (N-fertilization scenario)
 -----------------------------

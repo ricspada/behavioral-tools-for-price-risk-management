@@ -4,130 +4,139 @@ library(tidyverse)
 library(readxl)
 library(robustbase)
 
-##############################################################################
-# EPIC Crop Simulation Data
-##############################################################################
-
-# SimUID
-# -----------------------------
-# SimUID	simulation grid ID
-
-
-# CROP (crop abbreviations)
-# -----------------------------
-# CORN	corn
-# CSIL	maize silage
-# FPEA	field peas
-# OATS	oats
-# POTA	potatoes
-# RAPE	winter rape
-# SBAR	barley
-# SGBT	sugar beet
-# SOYB	soybeans
-# SUNF	sunflower
-# WRYE	winter rye
-# WWHT	winter wheat
-
-# ROT (cropping system)
-# -----------------------------
-# CRS1	crop rotation #1
-# CRS2	crop rotation #2
-# CRS3	crop rotation #3
-# CRS4	crop rotation #4
-# CRS5	crop rotation #5
-# CRS6	crop rotation #6
-# CRS7	crop rotation #7
-# MONO	nonocrop
-
-# FER (N-fertilization scenario)
-# -----------------------------
-# BAU	business as usual
-# N10	max 10 kgN/ha/yr
-# N50	max 50 kgN/ha/yr
-# N100	max 100 kgN/ha/yr
-# N250	max 250 kgN/ha/yr
-
-
-# IRR (irrigation scenario)
-# -----------------------------
-# ir	irrigated
-# rf	rainfed
-
-
-# WTH (meteorological forcing)
-# -----------------------------
-# cmip6_ipsl_ssp126	climate change (CMIP6, IPSL, ssp 126)
-# cmip6_ipsl_ssp585	climate change (CMIP6, IPSL, ssp 585)
-# cmip6_mpi_ssp126	climate change (CMIP6, MPI, ssp 126)
-# cmip6_mpi_ssp585	climate change (CMIP6, MPI, ssp 585)
-# hist			historical data
-
-
-# TIL (crop residue management scenario)
-# -----------------------------
-# contill_bau	conventional tillage, business-as-usual crop residue harvest
-# contill_r00	conventional tillage, crop residue harvest 100%
-# contill_r30	conventional tillage, crop residue harvest 70%
-# contill_r60	conventional tillage, crop residue harvest 40%
-# contill_r90	conventional tillage, crop residue harvest 10%
-# mintill_cons	minimum tillage, low crop residue harvest + mulching
-
-
-# YLD_DM* (crop yield)
-# -----------------------------
-# YLD_DM	dry-matter crop yield in tDM/ha
-
-# *the following water contents can be used to convert from dry matter to economic yield:
-# CORN	15%
-# CSIL	70%
-# FPEA	12%
-# OATS	10%
-# POTA	80%
-# RAPE	8%
-# SBAR	12%
-# SGBT	84%
-# SOYB	13%
-# SUNF	6%
-# WRYE	12%
-# WWHT	12%
-
-# FTN (N fertilization)
-# -----------------------------
-# FTN	N application rate in kgN/ha
-
-
+# import data 
 sim_data <- read_csv("1_Data/RawData/EPIC2/Riccardo_EPIC.csv") 
 
+# filter to winter wheat, rainfed only
 df_sim_data <- sim_data |> 
   filter(CROP == "WWHT", 
-         IRR == "rf" # rainfed only
-         )
-         
-df_sim_data |> 
-  group_by(WTH) |>
-  summarise(
-    mean_YLD_DM = mean(FTN),
-    sd_YLD_DM = sd(FTN),
-    n = n()
-  ) 
-summary(df_sim_data)
+         IRR == "rf",
+         WTH == "hist"             
+        ) |> 
+  # convert dry matter yield to economic yield (12% moisture content)
+  mutate(YLD = YLD_DM / 0.88) |>
+  mutate(FTN = round(FTN)) 
 
-# select only one grid location
-df_sim_data <- sim_data |> 
+# summary statistics 
+df_sim_data |> 
+  group_by(FTN) |> 
+  summarise(
+    mean_YLD = mean(YLD),
+    median_YLD = median(YLD),
+    sd_YLD = sd(YLD),
+    min_YLD = min(YLD),
+    max_YLD = max(YLD),
+    n = n()
+  ) |> 
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+# difference between 2 grid locations 
+df_sim_data |> 
+  group_by(SimUID) |> 
+  summarise(
+    mean_FTN = mean(FTN),
+    sd_FTN = sd(FTN),
+    min_FTN = min(FTN),
+    max_FTN = max(FTN),
+    mean_YLD = mean(YLD),
+    median_YLD = median(YLD),
+    sd_YLD = sd(YLD),
+    min_YLD = min(YLD),
+    max_YLD = max(YLD),
+    n = n()
+  ) |> 
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+# create separate datasets for each grid location
+grid1_data <- df_sim_data |> 
   filter(SimUID == 52338)
 
+grid2_data <- df_sim_data |> 
+  filter(SimUID == 52339)
 
+write_csv(grid1_data, "1_Data/Grid1_YieldData.csv")
+write_csv(grid2_data, "1_Data/Grid2_YieldData.csv")
 
-ggplot(sim_data, aes(x = FTN, y = YLD_DM)) +
+### plot ###########################################################################
+
+ggplot(grid1_data, aes(x = FTN, y = YLD)) +
   geom_point(alpha = 0.5)
 
 
 # plot yield function with data points
-ggplot(sim_data, aes(x = FTN, y = YLD_DM)) +
+ggplot(grid1_data, aes(x = FTN, y = YLD)) +
   geom_point(alpha = 0.5) +
   stat_smooth(method = "lm", 
-              formula = y ~ sqrt(x) + x, 
+              formula = y ~ I(sqrt(x)) + x, 
               color = "blue", se = FALSE) +
+  stat_smooth(method = "lm", 
+              formula = y ~ x, 
+              color = "red", se = FALSE) +
+  labs(title = "Yield Function",
+       x = "N Fertilization (kgN/ha)",
+       y = "Yield (tDM/ha)") +
+  theme_minimal()
+
+### remove 250 ####################################################################
+
+df1_sim_data <- df_sim_data |> 
+  filter(FTN != 250) 
+  
+# summary statistics 
+df1_sim_data |> 
+  group_by(FTN) |> 
+  summarise(
+    mean_YLD = mean(YLD),
+    median_YLD = median(YLD),
+    sd_YLD = sd(YLD),
+    min_YLD = min(YLD),
+    max_YLD = max(YLD),
+    n = n()
+  ) |> 
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+# difference between 2 grid locations 
+df1_sim_data |> 
+  group_by(SimUID) |> 
+  summarise(
+    mean_FTN = mean(FTN),
+    sd_FTN = sd(FTN),
+    min_FTN = min(FTN),
+    max_FTN = max(FTN),
+    mean_YLD = mean(YLD),
+    median_YLD = median(YLD),
+    sd_YLD = sd(YLD),
+    min_YLD = min(YLD),
+    max_YLD = max(YLD),
+    n = n()
+  ) |> 
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+# create separate datasets for each grid location
+grid1_alternative <- df1_sim_data |> 
+  filter(SimUID == 52338)
+
+grid2_alternative <- df1_sim_data |> 
+  filter(SimUID == 52339)
+
+# write_csv(grid1_data, "1_Data/Grid1_YieldData.csv")
+# write_csv(grid2_data, "1_Data/Grid2_YieldData.csv")
+
+### plot ###########################################################################
+
+ggplot(grid1_alternative, aes(x = FTN, y = YLD)) +
+  geom_point(alpha = 0.5)
+
+
+# plot yield function with data points
+ggplot(grid1_alternative, aes(x = FTN, y = YLD)) +
+  geom_point(alpha = 0.5) +
+  stat_smooth(method = "lm", 
+              formula = y ~ I(sqrt(x)) + x, 
+              color = "blue", se = FALSE) +
+  stat_smooth(method = "lm", 
+              formula = y ~ x, 
+              color = "red", se = FALSE) +
   labs(title = "Yield Function",
        x = "N Fertilization (kgN/ha)",
        y = "Yield (tDM/ha)") +

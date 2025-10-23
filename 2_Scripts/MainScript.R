@@ -16,20 +16,10 @@ set.seed(1234)
 ################################################################################
 
 ### 1.1 Get data from crop simulation model 
-sim_yield <- read_csv("1_Data/RawData/EPIC2/Riccardo_EPIC.csv") 
-
-df_sim_yield <- sim_yield |> 
-  filter(CROP == "WWHT",    # select winter wheat
-         SimUID == 52338,   # select only one grid location
-         IRR == "rf",       # rainfed only
-         # historical weather only (different weather scenarios are used only for 
-         # generating yield at N = 180 kgN/ha)
-         WTH == "hist"      
-         ) |> 
-  mutate(FTN = round(FTN))
+sim_yield <- read_csv("1_Data/Grid1_YieldData.csv") 
 
 # summary statistics 
-summary <- df_sim_yield |> 
+summary <- sim_yield |> 
   group_by(FTN) |> 
   summarise(
     mean_YLD = mean(YLD_DM),
@@ -41,17 +31,18 @@ summary <- df_sim_yield |>
   mutate(across(where(is.numeric), ~ round(., 2)))
 
 summary
-write_csv(summary, "3_Outputs/YieldSummary.csv")
+
+# write_csv(summary, "3_Outputs/YieldSummary.csv")
 
 ### 1.2 Just & Pope production function estimation
-yield_function <- lmrob(YLD_DM ~ sqrt(FTN) + FTN, data = df_sim_yield, method = "MM")
+yield_function <- lmrob(YLD_DM ~ sqrt(FTN) + FTN, data = sim_yield, method = "MM")
 
 # append residuals
-df_sim_yield <- df_sim_yield |> 
+sim_yield <- sim_yield |> 
   mutate(residuals = yield_function$residuals,
          abs_residuals = abs(residuals))
 
-variation_function <- lmrob(abs_residuals ~ sqrt(FTN), data = df_sim_yield, method = "MM")
+variation_function <- lmrob(abs_residuals ~ sqrt(FTN), data = sim_yield, method = "MM")
 
 # table of results
 stargazer(yield_function, variation_function, 
