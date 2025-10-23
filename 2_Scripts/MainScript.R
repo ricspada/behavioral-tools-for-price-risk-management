@@ -22,10 +22,10 @@ sim_yield <- read_csv("1_Data/Grid1_YieldData.csv")
 summary <- sim_yield |> 
   group_by(FTN) |> 
   summarise(
-    mean_YLD = mean(YLD_DM),
-    sd_YLD = sd(YLD_DM),
-    min_YLD = min(YLD_DM),
-    max_YLD = max(YLD_DM),
+    mean_YLD = mean(YLD),
+    sd_YLD = sd(YLD),
+    min_YLD = min(YLD),
+    max_YLD = max(YLD),
     n = n()
   ) |> 
   mutate(across(where(is.numeric), ~ round(., 2)))
@@ -111,6 +111,9 @@ w_data <- w_data[w_data[[2]] == "Bread_Wheat", ] # alt. 'Feed_Wheat'
 
 dat <- inner_join(w_data, f_data, by = "Date") # keep only 'common date'-datapoints
 
+# check missing values
+
+
 dat <- dat %>%
   rename(w_p = Avg_Price.x, f_p = Avg_Price.y) %>%
   mutate(
@@ -129,16 +132,22 @@ dat <- dat %>%
 # VAR select
 vardat <- dat %>% dplyr::select(w_p, f_p)
 
+# VAR Specification ----
+# select var order based on SBIC
 a <- VARselect(vardat, lag.max = 10, type = "const")
 a$selection #SC (BIC): 2 lags
-# summary(nvar <- VAR(vardat, p=2))
+summary(nvar <- VAR(vardat, p=2))
+summary(a)
 
-# add exo variables
+
+# add exogenous variables
 VARselect(vardat, lag.max =4, exogen = cbind(dat$w_ps1))
 VARselect(vardat, lag.max =4, exogen = cbind(dat$f_ps1))
 VARselect(vardat, lag.max =4, exogen = cbind(dat$w_ps1, dat$f_ps1)) #SC: 2
 
-#marginal spec
+# Specify and Estimate Q/VAR ----
+
+# marginal spec
 mw = w_p ~ w_p1 + f_p1 + w_p2 + f_p2 #wheat
 mf = f_p ~ w_p1 + f_p1 + w_p2 + f_p2 #fert
 
@@ -199,6 +208,7 @@ for (ii in 1:n) {
   F_w[ii] <- taus_dense[min(which(min(abs(w_p[ii] - y_w[ii,])) == abs(w_p[ii] - y_w[ii,])))]
   F_f[ii] <- taus_dense[min(which(min(abs(f_p[ii] - y_f[ii,])) == abs(f_p[ii] - y_f[ii,])))]
 }
+
 
 C <- F_w ~ F_f
 summary(lm(C))
