@@ -7,6 +7,8 @@ library(stargazer)
 library(robustbase)
 library(tidyverse)
 library(vars)
+library(tseries)
+library(patchwork)
 
 # Set seed for reproducibility
 set.seed(1234)
@@ -105,53 +107,131 @@ ggplot(w_data, aes(x = Date, color = Product, fill = Product)) +
   theme_minimal() +
   theme(legend.position = "bottom")
 
-### 2.2 QVAR and copula
+
+### 2.2 QVAR and copula #############################################################
+
 f_data <- f_data[f_data[[2]] == "CAN", ] # Keep only CAN data
 w_data <- w_data[w_data[[2]] == "Bread_Wheat", ] # alt. 'Feed_Wheat'
 
+# Check time ranges
+range(f_data$Date)
+range(w_data$Date)
+
+# Check for matching times
+common_times <- intersect(f_data$Date, w_data$Date)
+length(common_times)
+
+# Check time intervals (see if regularly spaced)
+diff(f_data$Date) 
+diff(w_data$Date)  
+
+# Merge datasets on common dates
 dat <- inner_join(w_data, f_data, by = "Date") # keep only 'common date'-datapoints
+dat <- dat |> 
+  rename(w_p = Avg_Price.x, f_p = Avg_Price.y)
 
-# check missing values
+range(dat$Date)
+diff(dat$Date) 
+
+time_diff <- diff(dat$Date)
+# check for time intervals that are not 14 days
+sum(time_diff != 14)
+
+# Do we need to ensure regular time intervals?
+
+# plot prices
+price_plot <- ggplot(dat, aes(x = Date)) +  
+  geom_line(aes(y = f_p,  linetype = "Nitrogen fertilizer price"), linewidth = 0.5) +
+  geom_line(aes(y = w_p,  linetype = "Wheat price"), linewidth = 0.5) +
+  scale_linetype_manual(values = c("Nitrogen fertilizer price" = "dashed", "Wheat price" = "solid")) +
+  scale_y_continuous(limits = c(0, NA), expand = c(0, 0)) +
+  labs(y = "Price (€/100 kg)",
+       x = "Date",
+       linetype = NULL) +
+  theme_classic() +
+  theme(legend.position = c(0.1, 0.9),
+        legend.justification = c(0, 1),
+        legend.background = element_rect(fill = "white", color = "black"))
+      
+# ggsave("3_Outputs/Fig_Prices_plot.pdf", plot = price_plot, width = 8, height = 6)
 
 
+# check for stationarity (p-value < 0.01 -> stationary)
+adf.test(dat$w_p, k=2) 
+adf.test(dat$f_p, k=2) 
+
+pp.test(dat$w_p)
+pp.test(dat$f_p)
+
+# time series are non-stationary: take first differences
+dat$dif_w_p <- c(NA, diff(dat$w_p))
+dat$dif_f_p <- c(NA, diff(dat$f_p))
+
+# drop first row with NA and check stationarity again
+dat <- dat[-1, ]
+
+pp.test(dat$dif_w_p)
+pp.test(dat$dif_f_p)
+
+
+# plot differenced prices
+plot_dif_w <- ggplot(dat, aes(x = Date)) +
+  geom_line(aes(y = dif_w_p), linewidth = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(y = "Wheat", x = NULL) +
+  theme_classic()
+
+plot_dif_f <- ggplot(dat, aes(x = Date)) +
+  geom_line(aes(y = dif_f_p), linewidth = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(y = "Fertilizer", x = NULL) +
+  theme_classic()
+
+# Stack vertically
+combined_dif_plots <- plot_dif_f / plot_dif_w
+combined_dif_plots
+# ggsave("3_Outputs/Fig_DifferencedPrices.pdf", plot = combined_dif_plots, width = 8, height = 6)
+
+
+# Create lags and squares
 dat <- dat %>%
-  rename(w_p = Avg_Price.x, f_p = Avg_Price.y) %>%
   mutate(
-    w_p1 = lag(w_p, 1), # wheat lags
-    w_p2 = lag(w_p, 2),
-    w_p3 = lag(w_p, 3),
-    w_p4 = lag(w_p, 4),
-    f_p1 = lag(f_p, 1), # fert lags
-    f_p2 = lag(f_p, 2),
-    f_p3 = lag(f_p, 3),
-    f_p4 = lag(f_p, 4),
+    w_p1 = lag(dif_w_p, 1), # wheat lags
+    w_p2 = lag(dif_w_p, 2),
+    w_p3 = lag(dif_w_p, 3),
+    w_p4 = lag(dif_w_p, 4),
+    f_p1 = lag(dif_f_p, 1), # fert lags
+    f_p2 = lag(dif_f_p, 2),
+    f_p3 = lag(dif_f_p, 3),
+    f_p4 = lag(dif_f_p, 4),
     w_ps1 = w_p1^2,     # squares
     f_ps1 = f_p1^2
-  ) %>% filter(!is.na(w_p4)) # remove NAs, only 2 lags are used -> over filtered?
+  ) %>% 
+  filter(!is.na(w_p4)) # remove NAs, only 2 lags are used -> over filtered?
 
 # VAR select
-vardat <- dat %>% dplyr::select(w_p, f_p)
+vardat <- dat %>% dplyr::select(dif_w_p, dif_f_p)
 
-# VAR Specification ----
+# VAR Specification
 # select var order based on SBIC
 a <- VARselect(vardat, lag.max = 10, type = "const")
-a$selection #SC (BIC): 2 lags
-summary(nvar <- VAR(vardat, p=2))
+a$selection #SC (BIC): 1 lag
+summary(nvar <- VAR(vardat, p=1))
 summary(a)
-
+a
 
 # add exogenous variables
 VARselect(vardat, lag.max =4, exogen = cbind(dat$w_ps1))
 VARselect(vardat, lag.max =4, exogen = cbind(dat$f_ps1))
 VARselect(vardat, lag.max =4, exogen = cbind(dat$w_ps1, dat$f_ps1)) #SC: 2
 
-# Specify and Estimate Q/VAR ----
+# Specify and Estimate QVAR
 
-# marginal spec
-mw = w_p ~ w_p1 + f_p1 + w_p2 + f_p2 #wheat
-mf = f_p ~ w_p1 + f_p1 + w_p2 + f_p2 #fert
+# individual marginal specifications
+mw <- w_p ~ w_p1 + f_p1 + w_p2 + f_p2 #wheat
+mf <- f_p ~ w_p1 + f_p1 + w_p2 + f_p2 #fert
 
-#psuedo R2s
+# Calculate pseudo R^2s
 taus_sparse <- c(.1, .3, .5, .7, .9)
 psu_r2s <- data.frame()
 rho <- function(u, tau) sum(u * (tau - (u < 0))) #rho calc from JP code
