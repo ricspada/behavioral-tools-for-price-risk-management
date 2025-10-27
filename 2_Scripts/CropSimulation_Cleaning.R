@@ -54,82 +54,17 @@ grid1_data <- df_sim_data |>
 grid2_data <- df_sim_data |> 
   filter(SimUID == 52339)
 
-write_csv(grid1_data, "1_Data/Grid1_YieldData.csv")
-write_csv(grid2_data, "1_Data/Grid2_YieldData.csv")
-
-### plot ###########################################################################
-
-ggplot(grid1_data, aes(x = FTN, y = YLD)) +
-  geom_point(alpha = 0.5)
-
-
-# plot yield function with data points
-ggplot(grid1_data, aes(x = FTN, y = YLD)) +
-  geom_point(alpha = 0.5) +
-  stat_smooth(method = "lm", 
-              formula = y ~ I(sqrt(x)) + x, 
-              color = "blue", se = FALSE) +
-  stat_smooth(method = "lm", 
-              formula = y ~ x, 
-              color = "red", se = FALSE) +
-  labs(title = "Yield Function",
-       x = "N Fertilization (kgN/ha)",
-       y = "Yield (tDM/ha)") +
-  theme_minimal()
-
-### remove 250 ####################################################################
-
-df1_sim_data <- df_sim_data |> 
-  filter(FTN != 250) 
-  
-# summary statistics 
-df1_sim_data |> 
-  group_by(FTN) |> 
-  summarise(
-    mean_YLD = mean(YLD),
-    median_YLD = median(YLD),
-    sd_YLD = sd(YLD),
-    min_YLD = min(YLD),
-    max_YLD = max(YLD),
-    n = n()
-  ) |> 
-  mutate(across(where(is.numeric), ~ round(., 2)))
-
-# difference between 2 grid locations 
-df1_sim_data |> 
-  group_by(SimUID) |> 
-  summarise(
-    mean_FTN = mean(FTN),
-    sd_FTN = sd(FTN),
-    min_FTN = min(FTN),
-    max_FTN = max(FTN),
-    mean_YLD = mean(YLD),
-    median_YLD = median(YLD),
-    sd_YLD = sd(YLD),
-    min_YLD = min(YLD),
-    max_YLD = max(YLD),
-    n = n()
-  ) |> 
-  mutate(across(where(is.numeric), ~ round(., 2)))
-
-# create separate datasets for each grid location
-grid1_alternative <- df1_sim_data |> 
-  filter(SimUID == 52338)
-
-grid2_alternative <- df1_sim_data |> 
-  filter(SimUID == 52339)
-
 # write_csv(grid1_data, "1_Data/Grid1_YieldData.csv")
 # write_csv(grid2_data, "1_Data/Grid2_YieldData.csv")
 
 ### plot ###########################################################################
 
-ggplot(grid1_alternative, aes(x = FTN, y = YLD)) +
+ggplot(grid1_data, aes(x = FTN, y = YLD)) +
   geom_point(alpha = 0.5)
 
 
 # plot yield function with data points
-ggplot(grid1_alternative, aes(x = FTN, y = YLD)) +
+ggplot(grid1_data, aes(x = FTN, y = YLD)) +
   geom_point(alpha = 0.5) +
   stat_smooth(method = "lm", 
               formula = y ~ I(sqrt(x)) + x, 
@@ -137,7 +72,6 @@ ggplot(grid1_alternative, aes(x = FTN, y = YLD)) +
   stat_smooth(method = "lm", 
               formula = y ~ x, 
               color = "red", se = FALSE) +
-  labs(title = "Yield Function",
-       x = "N Fertilization (kgN/ha)",
-       y = "Yield (tDM/ha)") +
+  labs(x = "N Fertilization (kgN/ha)",
+       y = "Yield (t/ha)") +
   theme_minimal()

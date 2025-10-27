@@ -33,8 +33,7 @@ summary <- sim_yield |>
   mutate(across(where(is.numeric), ~ round(., 2)))
 
 summary
-
-# write_csv(summary, "3_Outputs/YieldSummary.csv")
+# write_csv(summary, "3_Outputs/Table_YieldSummary.csv")
 
 ### 1.2 Just & Pope production function estimation
 yield_function <- lmrob(YLD_DM ~ sqrt(FTN) + FTN, data = sim_yield, method = "MM")
@@ -128,22 +127,23 @@ diff(w_data$Date)
 # Merge datasets on common dates
 dat <- inner_join(w_data, f_data, by = "Date") # keep only 'common date'-datapoints
 dat <- dat |> 
-  rename(w_p = Avg_Price.x, f_p = Avg_Price.y)
+  rename(w_p = Avg_Price.x, f_p = Avg_Price.y) |> 
+  dplyr::select(Date, w_p, f_p) 
 
 range(dat$Date)
 diff(dat$Date) 
 
-time_diff <- diff(dat$Date)
 # check for time intervals that are not 14 days
-sum(time_diff != 14)
+sum(diff(dat$Date) != 14)
 
-# Do we need to ensure regular time intervals?
+# we dont have regular 14-day intervals, data is recorder every 1st and 3rd monday of the month (sometimes 3 week gaps are introduced)
+# do we need to ensure regular time intervals?
 
 # plot prices
 price_plot <- ggplot(dat, aes(x = Date)) +  
-  geom_line(aes(y = f_p,  linetype = "Nitrogen fertilizer price"), linewidth = 0.5) +
+  geom_line(aes(y = f_p,  linetype = "Calcium Ammonium Nitrate price"), linewidth = 0.5) +
   geom_line(aes(y = w_p,  linetype = "Wheat price"), linewidth = 0.5) +
-  scale_linetype_manual(values = c("Nitrogen fertilizer price" = "dashed", "Wheat price" = "solid")) +
+  scale_linetype_manual(values = c("Calcium Ammonium Nitrate price" = "dashed", "Wheat price" = "solid")) +
   scale_y_continuous(limits = c(0, NA), expand = c(0, 0)) +
   labs(y = "Price (€/100 kg)",
        x = "Date",
@@ -152,8 +152,9 @@ price_plot <- ggplot(dat, aes(x = Date)) +
   theme(legend.position = c(0.1, 0.9),
         legend.justification = c(0, 1),
         legend.background = element_rect(fill = "white", color = "black"))
-      
-# ggsave("3_Outputs/Fig_Prices_plot.pdf", plot = price_plot, width = 8, height = 6)
+
+price_plot
+ggsave("3_Outputs/Fig_Prices.pdf", plot = price_plot, width = 6, height = 4)
 
 
 # check for stationarity (p-value < 0.01 -> stationary)
@@ -164,25 +165,30 @@ pp.test(dat$w_p)
 pp.test(dat$f_p)
 
 # time series are non-stationary: take first differences
-dat$dif_w_p <- c(NA, diff(dat$w_p))
-dat$dif_f_p <- c(NA, diff(dat$f_p))
+dif_dat <- dat |> 
+  mutate(
+    w_p = c(NA, diff(w_p)),
+    f_p = c(NA, diff(f_p))
+  ) |> 
+  drop_na()
 
-# drop first row with NA and check stationarity again
-dat <- dat[-1, ]
+# check for stationarity again
+adf.test(dif_dat$w_p, k=2)
+adf.test(dif_dat$f_p, k=2)
 
-pp.test(dat$dif_w_p)
-pp.test(dat$dif_f_p)
+pp.test(dif_dat$w_p)
+pp.test(dif_dat$f_p)
 
 
 # plot differenced prices
-plot_dif_w <- ggplot(dat, aes(x = Date)) +
-  geom_line(aes(y = dif_w_p), linewidth = 0.5) +
+plot_dif_w <- ggplot(dif_dat, aes(x = Date)) +
+  geom_line(aes(y = w_p), linewidth = 0.5) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   labs(y = "Wheat", x = NULL) +
   theme_classic()
 
-plot_dif_f <- ggplot(dat, aes(x = Date)) +
-  geom_line(aes(y = dif_f_p), linewidth = 0.5) +
+plot_dif_f <- ggplot(dif_dat, aes(x = Date)) +
+  geom_line(aes(y = f_p), linewidth = 0.5) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   labs(y = "Fertilizer", x = NULL) +
   theme_classic()
@@ -194,23 +200,23 @@ combined_dif_plots
 
 
 # Create lags and squares
-dat <- dat %>%
+dat <- dif_dat %>%
   mutate(
-    w_p1 = lag(dif_w_p, 1), # wheat lags
-    w_p2 = lag(dif_w_p, 2),
-    w_p3 = lag(dif_w_p, 3),
-    w_p4 = lag(dif_w_p, 4),
-    f_p1 = lag(dif_f_p, 1), # fert lags
-    f_p2 = lag(dif_f_p, 2),
-    f_p3 = lag(dif_f_p, 3),
-    f_p4 = lag(dif_f_p, 4),
+    w_p1 = lag(w_p, 1), # wheat lags
+    w_p2 = lag(w_p, 2),
+    w_p3 = lag(w_p, 3),
+    w_p4 = lag(w_p, 4),
+    f_p1 = lag(f_p, 1), # fert lags
+    f_p2 = lag(f_p, 2),
+    f_p3 = lag(f_p, 3),
+    f_p4 = lag(f_p, 4),
     w_ps1 = w_p1^2,     # squares
     f_ps1 = f_p1^2
-  ) %>% 
-  filter(!is.na(w_p4)) # remove NAs, only 2 lags are used -> over filtered?
-
+  ) |> 
+  drop_na()
+  
 # VAR select
-vardat <- dat %>% dplyr::select(dif_w_p, dif_f_p)
+vardat <- dat %>% dplyr::select(w_p, f_p)
 
 # VAR Specification
 # select var order based on SBIC
@@ -227,9 +233,10 @@ VARselect(vardat, lag.max =4, exogen = cbind(dat$w_ps1, dat$f_ps1)) #SC: 2
 
 # Specify and Estimate QVAR
 
-# individual marginal specifications
-mw <- w_p ~ w_p1 + f_p1 + w_p2 + f_p2 #wheat
-mf <- f_p ~ w_p1 + f_p1 + w_p2 + f_p2 #fert
+# define individual marginal specifications
+mw <- w_p ~ w_p1 + f_p1  #wheat
+mf <- f_p ~ w_p1 + f_p1  #fert
+
 
 # Calculate pseudo R^2s
 taus_sparse <- c(.1, .3, .5, .7, .9)
@@ -263,13 +270,11 @@ coeff_f <- fit_f$coeff
 # Independent variables
 w_p <- dat$w_p
 w_p1 <- dat$w_p1
-w_p2 <- dat$w_p2
 
 f_p <- dat$f_p
 f_p1 <- dat$f_p1
-f_p2 <- dat$f_p2
 
-X <- cbind(1, w_p1, f_p1, w_p2, f_p2) #col of 1s for b0
+X <- cbind(1, w_p1, f_p1) #col of 1s for b0
 
 # Inverse distributions
 y_w <- X %*% coeff_w
