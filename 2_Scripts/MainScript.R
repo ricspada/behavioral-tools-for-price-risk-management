@@ -154,7 +154,7 @@ price_plot <- ggplot(dat, aes(x = Date)) +
         legend.background = element_rect(fill = "white", color = "black"))
 
 price_plot
-ggsave("3_Outputs/Fig_Prices.pdf", plot = price_plot, width = 6, height = 4)
+#ggsave("3_Outputs/Fig_Prices.pdf", plot = price_plot, width = 6, height = 4)
 
 
 # check for stationarity (p-value < 0.01 -> stationary)
@@ -311,7 +311,84 @@ abline(h=0, lty=2)
 # 3. ADJUSTED CONTRACT PRICING
 ################################################################################
 
-# Burn rate 
+### Price path simulation ###########################################################
+
+Nt <- 180   # number of periods to simulate (months)
+Ns <- 1000 # number of draws
+Ys <- array(0, dim=c(2, Nt, Ns))
+
+# Set initial conditions 
+Ys[1, ,] <- dat$f_p[n] # get last price of fertilizer 
+Ys[2, ,] <- dat$w_p[n] # get last price of wheat
+
+# QVAR Simulation
+for (it in (3:Nt)) {
+  for (is in (1:Ns)) {
+    
+    f_pi1 <- Ys[1, it-1, is]
+    w_pi1 <- Ys[2, it-1, is]
+    
+    Xfi  <- cbind(1, f_pi1, w_pi1)
+    Xwi  <- cbind(1, f_pi1, w_pi1)
+    
+    qi <- sample(1:99, 1) 
+
+    yf <- Xfi %*% coeff_f[,qi]
+    
+    yw <- Xwi %*% coeff_w[,qi]
+    
+    Ys[1, it, is] <- yf
+    Ys[2, it, is] <- yw  
+    
+  }}
+
+# plot simulated paths
+ggplot() +
+  geom_line(aes(x = 1:Nt, y = Ys[1, ,1]), color = "blue", alpha = 0.5) +
+  geom_line(aes(x = 1:Nt, y = Ys[1, ,2]), color = "blue", alpha = 0.5) +
+  geom_line(aes(x = 1:Nt, y = Ys[1, ,3]), color = "blue", alpha = 0.5) +
+  labs(y = "Fertilizer Price Change (€/100 kg)", x = "Time Period") +
+  theme_minimal()
+
+# Reshape data for ggplot
+plot_data <- data.frame(
+  time = rep(1:Nt, Ns),
+  price = as.vector(Ys[1, , ]),
+  simulation = rep(1:Ns, each = Nt)
+)
+
+ggplot(plot_data, aes(x = time, y = price, group = simulation)) +
+  geom_line(color = "blue", alpha = 0.5) +
+  labs(y = "Fertilizer Price Change (€/100 kg)", x = "Time Period") +
+  theme_minimal()
+
+### Insurance Contract Price ###########################################################
+
+nitrogen_prices <- Ys[1, 1:Nt, ]  # Extract nitrogen price paths
+
+duration <- 12    # contract duration in months
+k1 <- 50          # strike price
+amount <- 100     # Notional amount (e.g., tons of nitrogen)
+
+payoffs_call <- array(0, dim=c(Nt, Ns))
+for (it in 1:Nt) {
+  payoffs_call[it, ] <- pmax(nitrogen_prices[it, ] - k1, 0) * amount
+}
+
+# Calculate Present Values 
+int <- 0.03  # Interest rate
+disc <- (1 + int)**(-(1:Nt/12))  # Monthly discount factors
+
+# Discounted payoffs 
+disc_cal_payoffs <- array(0, dim=c(Nt, Ns))
+for (it in 1:Nt) {
+  disc_cal_payoffs[it, ] <- payoffs_call[it, ] * disc[it]
+}
+
+# Average Discounted Payoff
+contract_price <- mean(disc_cal_payoffs)
+
+contract_price
 
 
 
