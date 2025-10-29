@@ -116,25 +116,24 @@ w_data <- w_data[w_data[[2]] == "Bread_Wheat", ] # alt. 'Feed_Wheat'
 range(f_data$Date)
 range(w_data$Date)
 
-# Check for matching times
-common_times <- intersect(f_data$Date, w_data$Date)
-length(common_times)
-
 # Check time intervals (see if regularly spaced)
 diff(f_data$Date) 
 diff(w_data$Date)  
 
 # Merge datasets on common dates
-dat <- inner_join(w_data, f_data, by = "Date") # keep only 'common date'-datapoints
-dat <- dat |> 
+dat <- inner_join(w_data, f_data, by = "Date") |> # keep only 'common date'-datapoints
   rename(w_p = Avg_Price.x, f_p = Avg_Price.y) |> 
-  dplyr::select(Date, w_p, f_p) 
+  dplyr::select(Date, w_p, f_p) |>
+  filter(Date >= as.Date("2009-01-01"))           # keep observations from 2009 onwards
 
 range(dat$Date)
 diff(dat$Date) 
+median(diff(dat$Date)) 
 
 # check for time intervals that are not 14 days
 sum(diff(dat$Date) != 14)
+sum(diff(dat$Date) == 14)
+sum(diff(dat$Date) > 21)
 
 # we dont have regular 14-day intervals, data is recorder every 1st and 3rd monday of the month (sometimes 3 week gaps are introduced)
 # do we need to ensure regular time intervals?
