@@ -126,6 +126,12 @@ diff(w_data$Date)
 
 # Merge datasets on common dates
 dat <- inner_join(w_data, f_data, by = "Date") # keep only 'common date'-datapoints
+
+# Remove pre-2009 obs. (monthly up until that point)
+dat <- dat %>%
+  mutate(date = as.Date(Date)) %>%
+  filter(date >= as.Date("2009-01-01"))
+
 dat <- dat |> 
   rename(w_p = Avg_Price.x, f_p = Avg_Price.y) |> 
   dplyr::select(Date, w_p, f_p) 
