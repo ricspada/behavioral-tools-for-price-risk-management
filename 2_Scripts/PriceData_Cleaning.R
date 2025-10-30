@@ -103,7 +103,7 @@ ggplot(fert_df, aes(x = Date, color = Product, fill = Product)) +
   theme(legend.position = "none")
 
 # Save fertilizers price  data 
-write.csv(fert_df, "1_Data/FertilizerPrices.csv", row.names = FALSE)
+#write.csv(fert_df, "1_Data/FertilizerPrices.csv", row.names = FALSE)
 
 ###############################################################################
 ### Crop data #################################################################
@@ -157,7 +157,7 @@ crop_df <- map2_dfr(old_dfs, new_dfs, rbind)
 crop_df$Year <- NULL
 
 # save crop price data
-write.csv(crop_df, "1_Data/WheatPrices.csv", row.names = FALSE)
+# write.csv(crop_df, "1_Data/WheatPrices.csv", row.names = FALSE)
 
 ###############################################################################
 ### Plot Crop data ############################################################
