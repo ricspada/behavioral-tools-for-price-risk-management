@@ -3,7 +3,7 @@ rm(list = ls()) # clean environment
 # Load required libraries
 library(quantreg)
 library(readxl)
-library(stargazer)
+library(modelsummary)
 library(robustbase)
 library(tidyverse)
 library(vars)
@@ -99,54 +99,69 @@ variation_function <- lmrob(
 )
 
 # table of results
-stargazer(
-  yield_function,
-  variation_function,
-  type = "text",
-  dep.var.labels = c("Yield function", "Variation function")
+models <- list(
+  "Yield function" = yield_function,
+  "Variation function" = variation_function
 )
 
-
+modelsummary(
+  models,
+  output = "3_Outputs/Table_YieldFunction.csv",
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+  coef_map = c(
+    "sqrt(FTN)" = "sqrt(N)",
+    "FTN" = "N",
+    "(Intercept)" = "Intercept"
+  )
+)
 ################################################################################
 # 2. NITROGEN PRICES - WHEAT PRICES RELATIONSHIP
 ################################################################################
 
-### 2.1 Import Data ###############################################################
+### Import data ###############################################
 
 f_data <- read_csv("1_Data/FertilizerPrices.csv")
-w_data <- read_csv("1_Data/WheatPrices.csv")
-
 f_data <- f_data[f_data[[2]] == "CAN", ] # Keep only CAN data
+
+### Wheat prices
+w_data <- read_csv("1_Data/Wheatprices.csv")
 w_data <- w_data[w_data[[2]] == "Bread_Wheat", ] # alt. 'Feed_Wheat'
 
 # Check time ranges
 range(f_data$Date)
 range(w_data$Date)
 
-# Check time intervals
+# Check time intervals (see if regularly spaced)
 diff(f_data$Date)
+unique(diff(f_data$Date))
 diff(w_data$Date)
+unique(diff(w_data$Date))
 
 # Merge datasets on common dates
-dat <- inner_join(w_data, f_data, by = "Date") |> # keep only 'common date'-datapoints
+dat <- inner_join(w_data, f_data, by = "Date") |>
   rename(w_p = Avg_Price.x, f_p = Avg_Price.y) |>
   dplyr::select(Date, w_p, f_p) |>
-  filter(Date >= as.Date("2009-01-01")) # Remove pre-2009 obs. (monthly up until that point)
+  # Remove pre-2009 obs. (monthly up until that point)
+  filter(Date >= as.Date("2009-01-01"))
 
 range(dat$Date)
 diff(dat$Date)
-median(diff(dat$Date))
 
 # check for time intervals that are not 14 days
+unique(diff(dat$Date))
 sum(diff(dat$Date) != 14)
 sum(diff(dat$Date) == 14)
-sum(diff(dat$Date) > 21)
 
-# we dont have regular 14-day intervals, data is recorder every 1st and 3rd monday of the month (sometimes 3 week gaps are introduced)
+# we dont have regular 14-day intervals, data is recorder every 1st and 3rd
+# monday of the month (sometimes 3 week gaps are introduced)
 
-# import adjusted prices (15 days gaps)
-adj_dat <- read_csv("1_Data/Adjusted_Prices.csv") |>
-  rename(Date = grid_date)
+# import adjusted data with regular 15 days intervals
+dat_adj <- read_csv("1_Data/Adjusted_Prices.csv") |>
+  rename(Date = grid_date) |>
+  mutate(
+    f_p = f_p / 100, # adjust prices to €/kg
+    w_p = w_p / 100
+  )
 
 # plot prices
 price_plot <- ggplot(dat, aes(x = Date)) +
@@ -183,7 +198,28 @@ adj_price_plot <- ggplot(adj_dat, aes(x = Date)) +
     )
   ) +
   scale_y_continuous(limits = c(0, NA), expand = c(0, 0)) +
-  labs(y = "Price (€/100 kg)", x = "Date", linetype = NULL) +
+  labs(y = "Price (€/100 kg)", x = NULL, linetype = NULL) +
+  theme_classic() +
+  theme(
+    legend.position = c(0.1, 0.9),
+    legend.justification = c(0, 1),
+    legend.background = element_rect(fill = "white", color = "black")
+  )
+
+adj_price_plot <- ggplot(dat_adj, aes(x = Date)) +
+  geom_line(
+    aes(y = f_p, linetype = "Calcium Ammonium Nitrate price"),
+    linewidth = 0.5
+  ) +
+  geom_line(aes(y = w_p, linetype = "Wheat price"), linewidth = 0.5) +
+  scale_linetype_manual(
+    values = c(
+      "Calcium Ammonium Nitrate price" = "dashed",
+      "Wheat price" = "solid"
+    )
+  ) +
+  scale_y_continuous(limits = c(0, NA), expand = c(0, 0)) +
+  labs(y = "price (€/kg)", x = NULL, linetype = NULL) +
   theme_classic() +
   theme(
     legend.position = c(0.1, 0.9),
@@ -193,11 +229,13 @@ adj_price_plot <- ggplot(adj_dat, aes(x = Date)) +
 
 price_plot
 adj_price_plot
+
 #ggsave("3_Outputs/Fig_Prices.pdf", plot = price_plot, width = 6, height = 4)
+#ggsave("3_Outputs/Fig_AdjPrices.pdf", plot = adj_price_plot, width = 6, height = 4)
 
-dat <- adj_dat
+dat <- dat_adj
 
-# check for stationarity (p-value < 0.01 -> stationary)
+# check for stationarity
 adf.test(dat$w_p, k = 2)
 adf.test(dat$f_p, k = 2)
 
@@ -231,13 +269,13 @@ Box.test(dif_dat$f_p)
 # plot differenced prices
 plot_dif_w <- ggplot(dif_dat, aes(x = Date)) +
   geom_line(aes(y = w_p), linewidth = 0.5) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
+  #geom_hline(yintercept = 0, linetype = "dashed") +
   labs(y = "Wheat", x = NULL) +
   theme_classic()
 
 plot_dif_f <- ggplot(dif_dat, aes(x = Date)) +
   geom_line(aes(y = f_p), linewidth = 0.5) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
+  #geom_hline(yintercept = 0, linetype = "dashed") +
   labs(y = "Fertilizer", x = NULL) +
   theme_classic()
 
@@ -246,7 +284,7 @@ combined_dif_plots <- plot_dif_f / plot_dif_w
 combined_dif_plots
 # ggsave("3_Outputs/Fig_DifferencedPrices.pdf", plot = combined_dif_plots, width = 8, height = 6)
 
-# Create lags and squares
+# Create regression variables
 dat <- dif_dat %>%
   mutate(
     w_p1 = lag(w_p, 1), # wheat lags
@@ -355,8 +393,14 @@ stargazer(
 mw <- w_p ~ w_p1 + f_p1 + w_ps1 + f_ps1 + tt + tt1 + Q1 + Q2 + Q3 + D
 mf <- f_p ~ w_p1 + f_p1 + w_ps1 + f_ps1 + tt + tt1 + Q1 + Q2 + Q3 + D
 
+mw <- w_p ~ w_p1 + f_p1 + w_ps1
+mf <- f_p ~ w_p1 + f_p1 + f_ps1
 
-# Calculate pseudo R^2s
+summary(lm(mw, data = dat))
+summary(lm(mf, data = dat))
+
+
+# Calculate pseudo R^2s for QVAR
 taus_sparse <- c(.1, .3, .5, .7, .9)
 psu_r2s <- data.frame()
 rho <- function(u, tau) sum(u * (tau - (u < 0))) #rho calc from JP code
@@ -376,6 +420,8 @@ for (tau in taus_sparse) {
   psu_r2s <- rbind(psu_r2s, data.frame(tau = tau, pseudoR2 = r2)) #store
 }
 psu_r2s
+
+# model fit is terrible (psudoR2 close to 0) at all quantiles
 
 # QVARs
 qvar_w <- rq(mw, tau = taus_sparse, data = dat)

@@ -5,7 +5,7 @@ library(tidyverse)
 library(RColorBrewer)
 
 #####################################################################
-### Fertilizer Data #################################################
+# Fertilizer Price Data #############################################
 #####################################################################
 
 # Get the files and sheets names
@@ -76,9 +76,7 @@ fert_df <- map2_dfr(old_dfs, new_dfs, rbind)
 #drop the Year column (redundant data)
 fert_df$Year <- NULL
 
-###########################################################################
 ### Plot fert data ########################################################
-###########################################################################
 
 # Create a named vector for titles
 product_titles <- c(
@@ -103,7 +101,7 @@ ggplot(fert_df, aes(x = Date, color = Product, fill = Product)) +
   theme(legend.position = "none")
 
 # Save fertilizers price  data 
-#write.csv(fert_df, "1_Data/FertilizerPrices.csv", row.names = FALSE)
+# write.csv(fert_df, "1_Data/FertilizerPrices.csv", row.names = FALSE)
 
 ###############################################################################
 ### Crop data #################################################################
@@ -159,9 +157,8 @@ crop_df$Year <- NULL
 # save crop price data
 # write.csv(crop_df, "1_Data/WheatPrices.csv", row.names = FALSE)
 
-###############################################################################
+
 ### Plot Crop data ############################################################
-###############################################################################
 
 ggplot(crop_df, aes(x = Date, color = Product, fill = Product)) +
   geom_ribbon(aes(ymin = Min_Price, ymax = Max_Price), alpha = 0.2, color = NA) +
@@ -356,4 +353,4 @@ dat_w <- map_w_to_grid(w_df, result$new_times, week_threshold = 3.5)
 combined_df <- merge(dat_f, dat_w, by = "grid_date")
 
 # Save combined data
-write.csv(combined_df, "1_Data/Adjusted_Prices.csv", row.names = FALSE)
+# write.csv(combined_df, "1_Data/Adjusted_Prices.csv", row.names = FALSE)

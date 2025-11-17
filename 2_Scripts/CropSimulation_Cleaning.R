@@ -7,7 +7,7 @@ library(robustbase)
 # import data 
 sim_data <- read_csv("1_Data/RawData/EPIC2/Riccardo_EPIC.csv") 
 
-# filter to winter wheat, rainfed only
+# filter to winter wheat
 df_sim_data <- sim_data |> 
   filter(CROP == "WWHT", 
          IRR == "rf",
@@ -75,3 +75,32 @@ ggplot(grid1_data, aes(x = FTN, y = YLD)) +
   labs(x = "N Fertilization (kgN/ha)",
        y = "Yield (t/ha)") +
   theme_minimal()
+
+# plot yield level by fertilization treatment
+box_plot <- ggplot(grid1_data, aes(x = as.factor(FTN), y = YLD)) +
+  geom_boxplot() +
+  labs(x = "Fertilization Treatment (kgN/ha)",
+       y = "Yield (t/ha)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14))
+
+box_plot
+
+
+# plot yield level by year
+box_plot1 <- ggplot(grid1_data, aes(x = as.factor(YR), y = YLD)) +
+  geom_boxplot() +
+  labs(x = NULL,
+       y = "Yield (t/ha)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 14))
+
+box_plot1
+ggsave("3_Outputs/Fig_Yield_by_Year.png", box_plot1, width = 8, height = 6)
+
+

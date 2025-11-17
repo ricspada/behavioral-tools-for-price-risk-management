@@ -8,7 +8,7 @@ library(rlist)
 library(stargazer)
 library(Qtools)
 
-dat1 <- read.csv("data_soybean.csv", header = TRUE )
+dat1 <- read.csv("2_Scripts/example_code/QVAR_Li_Chavas_2021/data_soybean.csv", header = TRUE )
 dat1[,c(4,5)] <- log(dat1[,c(4,5)])
 
 nn <- nrow(dat1)
