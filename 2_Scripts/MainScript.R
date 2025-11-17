@@ -3,7 +3,7 @@ rm(list = ls()) # clean environment
 # Load required libraries
 library(quantreg)
 library(readxl)
-library(stargazer)
+library(modelsummary)
 library(robustbase)
 library(tidyverse)
 library(vars)
@@ -46,97 +46,63 @@ sim_yield <- sim_yield |>
 variation_function <- lmrob(abs_residuals ~ sqrt(FTN), data = sim_yield, method = "MM")
 
 # table of results
-stargazer(yield_function, variation_function, 
-          type = "text",
-          dep.var.labels = c("Yield function", "Variation function"),
-          covariate.labels = c("sqrt(N)", "N", "Intercept")
-         )
+models <- list(
+  "Yield function" = yield_function,
+  "Variation function" = variation_function
+)
 
-
+modelsummary(models,
+             output = "3_Outputs/Table_YieldFunction.csv",
+             stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+             coef_map = c("sqrt(FTN)" = "sqrt(N)", "FTN" = "N", "(Intercept)" = "Intercept")
+)
 ################################################################################
 # 2. NITROGEN PRICES - WHEAT PRICES RELATIONSHIP
 ################################################################################
 
-### Abbreviations and explanations ##############################################
-
-### Prices refer to the Cologne Lowland
-
-# Fertilizers (prices are in €/100 kg)
-
-# CAN = Calcium Ammonium Nitrate (CAN), 27% N
-# UAN = Urea Ammonium Nitrate (UAN), 28% N
-# ASN = Ammonium Sulphate Nitrate (ASN),26% N + 13% S
-# AS  = Ammonium Sulphate (AS),21% N + 24% S
-# urea_P = Urea 46% N, granulated, protected (Urea_P), 46% N
-# urea   = Urea 46% N, granulated, (Urea), 46% N
-# DAP = Diammonium phosphate, (DAP) 18% N + 46% P2O5
-# TSP = Triple superphosphate (TSP) 45 % P2O5
-# Kornkali = Kornkali + Mg, 38 % K2O + 6 % MgO
-
-# Wheat (prices are in €/100 kg)
-
-# Bread_Wheat = Bread wheat (higher quality)
-# Feed_Wheat  = Feed wheat  (lower quality)
-
-
-### 2.1 Import Data ###############################################################
+### Import data ###############################################
 
 ### Fertilizer prices 
 f_data <- read_csv("1_Data/FertilizerPrices.csv")
-
-ggplot(f_data, aes(x = Date, color = Product, fill = Product)) +
-  geom_ribbon(aes(ymin = Min_Price, ymax = Max_Price), alpha = 0.2, color = NA) +
-  geom_line(aes(y = Avg_Price), linewidth = 0.8) +
-  facet_wrap(~ Product, scales = "fixed", ncol = 3) +
-  labs(y = "Price (€/100 kg)",
-       x = "Date") +
-  theme_minimal() +
-  theme(legend.position = "none")
+f_data <- f_data[f_data[[2]] == "CAN", ] # Keep only CAN data
 
 ### Wheat prices 
 w_data <- read_csv("1_Data/Wheatprices.csv")
-
-ggplot(w_data, aes(x = Date, color = Product, fill = Product)) +
-  geom_ribbon(aes(ymin = Min_Price, ymax = Max_Price), alpha = 0.2, color = NA) +
-  geom_line(aes(y = Avg_Price), linewidth = 0.8) +
-  scale_color_brewer(palette = "Dark2") +
-  scale_fill_brewer(palette = "Set2") +
-  labs(y = "Price (€/100 kg)",
-       x = "Date") +
-  theme_minimal() +
-  theme(legend.position = "bottom")
-
-
-### 2.2 QVAR and copula #############################################################
-
-f_data <- f_data[f_data[[2]] == "CAN", ] # Keep only CAN data
 w_data <- w_data[w_data[[2]] == "Bread_Wheat", ] # alt. 'Feed_Wheat'
 
 # Check time ranges
-range(f_data$Date)
+range(f_data$Date) 
 range(w_data$Date)
 
 # Check time intervals (see if regularly spaced)
-diff(f_data$Date) 
-diff(w_data$Date)  
+diff(f_data$Date)
+unique(diff(f_data$Date))
+diff(w_data$Date)
+unique(diff(w_data$Date))  
 
 # Merge datasets on common dates
-dat <- inner_join(w_data, f_data, by = "Date") |> # keep only 'common date'-datapoints  
+dat <- inner_join(w_data, f_data, by = "Date") |>  
   rename(w_p = Avg_Price.x, f_p = Avg_Price.y) |> 
   dplyr::select(Date, w_p, f_p) |>
-  filter(Date >= as.Date("2009-01-01")) # Remove pre-2009 obs. (monthly up until that point)
+  # Remove pre-2009 obs. (monthly up until that point)
+  filter(Date >= as.Date("2009-01-01")) 
 
 range(dat$Date)
 diff(dat$Date) 
-median(diff(dat$Date)) 
 
 # check for time intervals that are not 14 days
+unique(diff(dat$Date))
 sum(diff(dat$Date) != 14)
 sum(diff(dat$Date) == 14)
-sum(diff(dat$Date) > 21)
 
-# we dont have regular 14-day intervals, data is recorder every 1st and 3rd monday of the month (sometimes 3 week gaps are introduced)
-# do we need to ensure regular time intervals?
+# we dont have regular 14-day intervals, data is recorder every 1st and 3rd 
+# monday of the month (sometimes 3 week gaps are introduced)
+
+# import adjusted data with regular 15 days intervals
+dat_adj <- read_csv("1_Data/Adjusted_Prices.csv") |> 
+  rename(Date = grid_date) |>
+  mutate(f_p = f_p/100,  # adjust prices to €/kg
+         w_p = w_p/100)
 
 # plot prices
 price_plot <- ggplot(dat, aes(x = Date)) +  
@@ -145,7 +111,20 @@ price_plot <- ggplot(dat, aes(x = Date)) +
   scale_linetype_manual(values = c("Calcium Ammonium Nitrate price" = "dashed", "Wheat price" = "solid")) +
   scale_y_continuous(limits = c(0, NA), expand = c(0, 0)) +
   labs(y = "Price (€/100 kg)",
-       x = "Date",
+       x = NULL,
+       linetype = NULL) +
+  theme_classic() +
+  theme(legend.position = c(0.1, 0.9),
+        legend.justification = c(0, 1),
+        legend.background = element_rect(fill = "white", color = "black"))
+
+adj_price_plot <- ggplot(dat_adj, aes(x = Date)) +  
+  geom_line(aes(y = f_p,  linetype = "Calcium Ammonium Nitrate price"), linewidth = 0.5) +
+  geom_line(aes(y = w_p,  linetype = "Wheat price"), linewidth = 0.5) +
+  scale_linetype_manual(values = c("Calcium Ammonium Nitrate price" = "dashed", "Wheat price" = "solid")) +
+  scale_y_continuous(limits = c(0, NA), expand = c(0, 0)) +
+  labs(y = "price (€/kg)",
+       x = NULL,
        linetype = NULL) +
   theme_classic() +
   theme(legend.position = c(0.1, 0.9),
@@ -153,12 +132,16 @@ price_plot <- ggplot(dat, aes(x = Date)) +
         legend.background = element_rect(fill = "white", color = "black"))
 
 price_plot
+adj_price_plot
+
 #ggsave("3_Outputs/Fig_Prices.pdf", plot = price_plot, width = 6, height = 4)
+#ggsave("3_Outputs/Fig_AdjPrices.pdf", plot = adj_price_plot, width = 6, height = 4)
 
+dat <- dat_adj
 
-# check for stationarity (p-value < 0.01 -> stationary)
-adf.test(dat$w_p, k=2) 
-adf.test(dat$f_p, k=2) 
+# check for stationarity
+adf.test(dat$w_p, k=2)
+adf.test(dat$f_p, k=2)
 
 pp.test(dat$w_p)
 pp.test(dat$f_p)
@@ -172,8 +155,8 @@ dif_dat <- dat |>
   drop_na()
 
 # check for stationarity again
-adf.test(dif_dat$w_p, k=2)
-adf.test(dif_dat$f_p, k=2)
+adf.test(dif_dat$w_p, k=1)
+adf.test(dif_dat$f_p, k=1)
 
 pp.test(dif_dat$w_p)
 pp.test(dif_dat$f_p)
@@ -182,13 +165,13 @@ pp.test(dif_dat$f_p)
 # plot differenced prices
 plot_dif_w <- ggplot(dif_dat, aes(x = Date)) +
   geom_line(aes(y = w_p), linewidth = 0.5) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
+  #geom_hline(yintercept = 0, linetype = "dashed") +
   labs(y = "Wheat", x = NULL) +
   theme_classic()
 
 plot_dif_f <- ggplot(dif_dat, aes(x = Date)) +
   geom_line(aes(y = f_p), linewidth = 0.5) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
+  #geom_hline(yintercept = 0, linetype = "dashed") +
   labs(y = "Fertilizer", x = NULL) +
   theme_classic()
 
@@ -198,7 +181,7 @@ combined_dif_plots
 # ggsave("3_Outputs/Fig_DifferencedPrices.pdf", plot = combined_dif_plots, width = 8, height = 6)
 
 
-# Create lags and squares
+# Create regression variables
 dat <- dif_dat %>%
   mutate(
     w_p1 = lag(w_p, 1), # wheat lags
@@ -221,23 +204,37 @@ vardat <- dat %>% dplyr::select(w_p, f_p)
 # select var order based on SBIC
 a <- VARselect(vardat, lag.max = 10, type = "const")
 a$selection #SC (BIC): 1 lag
-summary(nvar <- VAR(vardat, p=1))
-summary(a)
-a
+
+var1 <- VAR(vardat, p=1)
+summary(var1)
+serial.test(var1)
+
+# VAR(1) residuals are correlated
+
+var2 <- VAR(vardat, p=2)
+summary(var2)
+serial.test(var2)
+
+# including more lags does not help much, try adding other variables
 
 # add exogenous variables
 VARselect(vardat, lag.max =4, exogen = cbind(dat$w_ps1))
 VARselect(vardat, lag.max =4, exogen = cbind(dat$f_ps1))
-VARselect(vardat, lag.max =4, exogen = cbind(dat$w_ps1, dat$f_ps1)) #SC: 2
-
-# Specify and Estimate QVAR
+VARselect(vardat, lag.max =4, exogen = cbind(dat$w_ps1, dat$f_ps1))
 
 # define individual marginal specifications
 mw <- w_p ~ w_p1 + f_p1  #wheat
 mf <- f_p ~ w_p1 + f_p1  #fert
 
+mw <- w_p ~ w_p1 + f_p1 + w_ps1
+mf <- f_p ~ w_p1 + f_p1 + f_ps1
 
-# Calculate pseudo R^2s
+summary(lm(mw, data = dat))
+summary(lm(mf, data = dat))
+
+
+
+# Calculate pseudo R^2s for QVAR
 taus_sparse <- c(.1, .3, .5, .7, .9)
 psu_r2s <- data.frame()
 rho <- function(u, tau) sum(u * (tau - (u < 0))) #rho calc from JP code
@@ -258,6 +255,8 @@ for (tau in taus_sparse) {
   psu_r2s <- rbind(psu_r2s, data.frame(tau = tau, pseudoR2 = r2)) #store
 }
 psu_r2s
+
+# model fit is terrible (psudoR2 close to 0) at all quantiles
 
 # QVARs
 taus_dense <- seq(0.01, 0.99, by = 0.01)
