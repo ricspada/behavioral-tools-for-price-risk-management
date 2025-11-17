@@ -3,6 +3,7 @@ rm(list = ls()) # clean environment
 # Load required libraries
 library(quantreg)
 library(readxl)
+library(stargazer)
 library(modelsummary)
 library(robustbase)
 library(tidyverse)
@@ -19,28 +20,29 @@ set.seed(1234)
 ################################################################################
 
 ### 1.1 Get data from crop simulation model
-sim_yield <- read_csv("1_Data/Grid1_YieldData.csv")
+sim_yield <- read_csv("1_Data/RawData/EPIC2/Riccardo_EPIC.csv") 
 
-unique(sim_yield$TIL)
-unique(sim_yield$ROT)
+sim_yield <- sim_yield |> 
+  filter(
+    CROP == "WWHT",  # winter wheat only
+    SimUID == 52338  # select one grid location (alternative 52339)
+    
+    # different weather and irrigation scenarios are sim only for FTN = 180
+    # WTH == "hist",   # historical weather only
+    # IRR == "rf"      # rainfed only
+  ) |> 
+    
+  # convert dry matter yield to economic yield (12% moisture content)
+  mutate(YLD = YLD_DM / 0.88,
+         FTN = round(FTN))
+  
 
-# create dummies for ROT and TIL
-sim_yield <- sim_yield |>
-  mutate(
-    rot_mono = ifelse(ROT == "MONO", 1, 0),
-    rot1 = ifelse(ROT == "CRS1", 1, 0),
-    rot2 = ifelse(ROT == "CRS2", 1, 0),
-    rot3 = ifelse(ROT == "CRS3", 1, 0),
-    rot4 = ifelse(ROT == "CRS4", 1, 0),
-    rot6 = ifelse(ROT == "CRS6", 1, 0),
-    rot7 = ifelse(ROT == "CRS7", 1, 0),
-    til_bau = ifelse(TIL == "contill_bau", 1, 0),
-    til_min_cons = ifelse(TIL == "mintill_cons", 1, 0),
-    til_contill_r00 = ifelse(TIL == "contill_r00", 1, 0),
-    til_contill_r30 = ifelse(TIL == "contill_r30", 1, 0),
-    til_contill_r60 = ifelse(TIL == "contill_r60", 1, 0),
-    til_contill_r90 = ifelse(TIL == "contill_r90", 1, 0)
-  )
+  
+# plot the distribution of yields
+ggplot(sim_yield, aes(x = YLD)) +
+  geom_histogram(binwidth = 0.1) +
+  labs(x = "Yield (t/ha)", y = "Frequency") +
+  theme_minimal() 
 
 # summary statistics
 summary <- sim_yield |>
@@ -48,6 +50,8 @@ summary <- sim_yield |>
   summarise(
     mean_YLD = mean(YLD),
     sd_YLD = sd(YLD),
+    median_YLD = median(YLD),
+    MAD_YLD = mad(YLD),
     min_YLD = min(YLD),
     max_YLD = max(YLD),
     n = n()
@@ -57,16 +61,24 @@ summary <- sim_yield |>
 summary
 # write_csv(summary, "3_Outputs/Table_YieldSummary.csv")
 
-### 1.2 Just & Pope production function estimation
+# create control variables 
+sim_yield <- sim_yield |>
+  mutate(
+    irr = ifelse(IRR == "ir", 1, 0),
+    til_bau = ifelse(TIL == "contill_bau", 1, 0),
+    til_min_cons = ifelse(TIL == "mintill_cons", 1, 0),
+    til_contill_r00 = ifelse(TIL == "contill_r00", 1, 0),
+    til_contill_r30 = ifelse(TIL == "contill_r30", 1, 0),
+    til_contill_r60 = ifelse(TIL == "contill_r60", 1, 0),
+    til_contill_r90 = ifelse(TIL == "contill_r90", 1, 0)
+  )
+
+### Just & Pope production function estimation #######################################
+
 yield_function <- lmrob(
   YLD ~ sqrt(FTN) +
     FTN +
-    rot1 +
-    rot2 +
-    rot3 +
-    rot4 +
-    rot6 +
-    rot7 +
+    irr +
     til_min_cons +
     til_contill_r00 +
     til_contill_r30 +
@@ -75,6 +87,8 @@ yield_function <- lmrob(
   data = sim_yield,
   method = "MM"
 )
+
+summary(yield_function)
 
 # append residuals
 sim_yield <- sim_yield |>
@@ -83,12 +97,7 @@ sim_yield <- sim_yield |>
 variation_function <- lmrob(
   abs_residuals ~ sqrt(FTN) +
     FTN +
-    rot1 +
-    rot2 +
-    rot3 +
-    rot4 +
-    rot6 +
-    rot7 +
+    irr +
     til_min_cons +
     til_contill_r00 +
     til_contill_r30 +
@@ -97,6 +106,8 @@ variation_function <- lmrob(
   data = sim_yield,
   method = "MM"
 )
+
+summary(variation_function)
 
 # table of results
 models <- list(
@@ -107,13 +118,9 @@ models <- list(
 modelsummary(
   models,
   output = "3_Outputs/Table_YieldFunction.csv",
-  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-  coef_map = c(
-    "sqrt(FTN)" = "sqrt(N)",
-    "FTN" = "N",
-    "(Intercept)" = "Intercept"
-  )
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01)
 )
+
 ################################################################################
 # 2. NITROGEN PRICES - WHEAT PRICES RELATIONSHIP
 ################################################################################
@@ -123,7 +130,6 @@ modelsummary(
 f_data <- read_csv("1_Data/FertilizerPrices.csv")
 f_data <- f_data[f_data[[2]] == "CAN", ] # Keep only CAN data
 
-### Wheat prices
 w_data <- read_csv("1_Data/Wheatprices.csv")
 w_data <- w_data[w_data[[2]] == "Bread_Wheat", ] # alt. 'Feed_Wheat'
 
