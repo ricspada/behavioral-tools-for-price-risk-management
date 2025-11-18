@@ -191,7 +191,7 @@ price_plot <- ggplot(dat, aes(x = Date)) +
     legend.background = element_rect(fill = "white", color = "black")
   )
 
-adj_price_plot <- ggplot(adj_dat, aes(x = Date)) +
+adj_price_plot <- ggplot(dat_adj, aes(x = Date)) +
   geom_line(
     aes(y = f_p, linetype = "Calcium Ammonium Nitrate price"),
     linewidth = 0.5
@@ -575,6 +575,59 @@ for (it in 1:Nt) {
 contract_price <- mean(disc_cal_payoffs)
 
 contract_price
+
+#------- Analytical contract price calc (currently based on simple GBM) ----------
+params <- list(
+  n <- 10000,       # number of simulated paths
+  t <- 10,         # total years
+  dt <- 1/12,            # monthly steps
+  mu <- 0.0,             # drift
+  sigma <- 0.5,          # volatility
+  s0 <- 200,               # starting price
+  p_cap <- 200,          # price cap
+  r <- 0.05             # annual discount rate
+) #temporary, estimate based on data etc.
+
+#Expected cost of adjusted contract 
+price_ceiling_cost <- function(params){
+  with(params, {
+    t_vec <- seq(dt, t, by = dt)
+    
+    #black-scholes
+    d1P <- (log(s0 / p_cap) + (mu + 0.5 * sigma^2) * t_vec) / (sigma * sqrt(t_vec))
+    d2P <- d1P - sigma * sqrt(t_vec)
+    
+    cost_t <- s0 * exp(mu * t_vec) * pnorm(d1P) - p_cap * pnorm(d2P)
+    cost_PV <- exp(-r * t_vec) * cost_t
+    
+    sum(cost_PV)
+  })
+}
+
+# Expected cost of forward contract
+forward_cost <- function(params, f) {
+  with(params, {
+    t_vec <- seq(dt, t, by = dt)
+    E_P_t <- s0 * exp(mu * t_vec)
+    cost_t <- E_P_t - f
+    sum(exp(-r * t_vec) * cost_t)
+  })
+}
+
+#Finds the cost-equal forward contract (based on adj contract cost)
+cost_equal <- function(params) {
+  
+  target_cost <- price_ceiling_cost(params) #finds cost of adj contract
+  
+  cost_diff <- function(f) {
+    forward_cost(params, f) - target_cost
+  }
+  
+  uniroot(cost_diff, lower = 0, upper = 2000)$root #forward contract price where both contract are cost equivalent
+}
+
+f_star <- cost_equal(params)
+f_star
 
 ################################################################################
 # 4. MONTE CARLO SIMULATION OF UTILITY OF PROFITS FUNCTIONS
