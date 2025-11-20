@@ -3,7 +3,6 @@ rm(list = ls()) # clean environment
 # Load required libraries
 library(quantreg)
 library(readxl)
-library(stargazer)
 library(modelsummary)
 library(robustbase)
 library(tidyverse)
@@ -11,6 +10,7 @@ library(vars)
 library(tseries)
 library(patchwork)
 library(urca)
+library(moments)
 
 # Set seed for reproducibility
 set.seed(1234)
@@ -27,17 +27,14 @@ sim_yield <- sim_yield |>
     CROP == "WWHT",  # winter wheat only
     SimUID == 52338  # select one grid location (alternative 52339)
     
-    # different weather and irrigation scenarios are sim only for FTN = 180
-    # WTH == "hist",   # historical weather only
-    # IRR == "rf"      # rainfed only
+    # different weather scenarios are simulated only for FTN = 180
+    # WTH == "hist"   # historical weather only
   ) |> 
     
   # convert dry matter yield to economic yield (12% moisture content)
   mutate(YLD = YLD_DM / 0.88,
-         FTN = round(FTN))
-  
+         FTN = round(FTN)) # weird behavior of FTN variable, round to be safe   
 
-  
 # plot the distribution of yields
 ggplot(sim_yield, aes(x = YLD)) +
   geom_histogram(binwidth = 0.1) +
@@ -148,7 +145,9 @@ dat <- inner_join(w_data, f_data, by = "Date") |>
   rename(w_p = Avg_Price.x, f_p = Avg_Price.y) |>
   dplyr::select(Date, w_p, f_p) |>
   # Remove pre-2009 obs. (monthly up until that point)
-  filter(Date >= as.Date("2009-01-01"))
+  filter(Date >= as.Date("2009-01-01")) |> 
+  # Transform prices to €/kg
+  mutate(w_p = w_p / 100, f_p = f_p / 100)
 
 range(dat$Date)
 diff(dat$Date)
@@ -161,72 +160,22 @@ sum(diff(dat$Date) == 14)
 # we dont have regular 14-day intervals, data is recorder every 1st and 3rd
 # monday of the month (sometimes 3 week gaps are introduced)
 
-# import adjusted data with regular 15 days intervals
-dat_adj <- read_csv("1_Data/Adjusted_Prices.csv") |>
-  rename(Date = grid_date) |>
-  mutate(
-    f_p = f_p / 100, # adjust prices to €/kg
-    w_p = w_p / 100
-  )
-
 # plot prices
 price_plot <- ggplot(dat, aes(x = Date)) +
   geom_line(
-    aes(y = f_p, linetype = "Calcium Ammonium Nitrate price"),
+    aes(y = f_p, color = "Calcium Ammonium Nitrate price"),
     linewidth = 0.5
   ) +
-  geom_line(aes(y = w_p, linetype = "Wheat price"), linewidth = 0.5) +
-  scale_linetype_manual(
+  geom_line(aes(y = w_p, color = "Wheat price"), linewidth = 0.5) +
+  scale_y_continuous(limits = c(0, NA), expand = c(0, 0)) +
+  scale_color_manual(
     values = c(
-      "Calcium Ammonium Nitrate price" = "dashed",
-      "Wheat price" = "solid"
+      "Calcium Ammonium Nitrate price" = "blue",
+      "Wheat price" = "orange"
     )
   ) +
-  scale_y_continuous(limits = c(0, NA), expand = c(0, 0)) +
-  labs(y = "Price (€/100 kg)", x = "Date", linetype = NULL) +
-  theme_classic() +
-  theme(
-    legend.position = c(0.1, 0.9),
-    legend.justification = c(0, 1),
-    legend.background = element_rect(fill = "white", color = "black")
-  )
-
-adj_price_plot <- ggplot(dat_adj, aes(x = Date)) +
-  geom_line(
-    aes(y = f_p, linetype = "Calcium Ammonium Nitrate price"),
-    linewidth = 0.5
-  ) +
-  geom_line(aes(y = w_p, linetype = "Wheat price"), linewidth = 0.5) +
-  scale_linetype_manual(
-    values = c(
-      "Calcium Ammonium Nitrate price" = "dashed",
-      "Wheat price" = "solid"
-    )
-  ) +
-  scale_y_continuous(limits = c(0, NA), expand = c(0, 0)) +
-  labs(y = "Price (€/100 kg)", x = NULL, linetype = NULL) +
-  theme_classic() +
-  theme(
-    legend.position = c(0.1, 0.9),
-    legend.justification = c(0, 1),
-    legend.background = element_rect(fill = "white", color = "black")
-  )
-
-adj_price_plot <- ggplot(dat_adj, aes(x = Date)) +
-  geom_line(
-    aes(y = f_p, linetype = "Calcium Ammonium Nitrate price"),
-    linewidth = 0.5
-  ) +
-  geom_line(aes(y = w_p, linetype = "Wheat price"), linewidth = 0.5) +
-  scale_linetype_manual(
-    values = c(
-      "Calcium Ammonium Nitrate price" = "dashed",
-      "Wheat price" = "solid"
-    )
-  ) +
-  scale_y_continuous(limits = c(0, NA), expand = c(0, 0)) +
-  labs(y = "price (€/kg)", x = NULL, linetype = NULL) +
-  theme_classic() +
+  labs(y = "Price (€/kg)", x = NULL, color = NULL) +
+  theme_minimal() +
   theme(
     legend.position = c(0.1, 0.9),
     legend.justification = c(0, 1),
@@ -234,19 +183,51 @@ adj_price_plot <- ggplot(dat_adj, aes(x = Date)) +
   )
 
 price_plot
-adj_price_plot
 
 #ggsave("3_Outputs/Fig_Prices.pdf", plot = price_plot, width = 6, height = 4)
-#ggsave("3_Outputs/Fig_AdjPrices.pdf", plot = adj_price_plot, width = 6, height = 4)
 
-dat <- dat_adj
 
 # check for stationarity
-adf.test(dat$w_p, k = 2)
-adf.test(dat$f_p, k = 2)
+adf.test(dat$f_p, k=24)
+adf.test(dat$f_p, k=12)
+adf.test(dat$f_p, k=6)
+adf.test(dat$f_p, k=4)
+adf.test(dat$f_p, k=2)
+# reject the null (non-stat) for lags >12 (half year) => stationary 
+# fail to reject the null for lags <6 => non-stationary at seasonal frequencies
+
+adf_f <- adf.test(dat$f_p, k=4)
+
+# Dickey-Fuller test may have low power 
+# (H0 not rejected, whereas there may not be a unit root)
+
+kpss.test(dat$f_p, null = "Trend")
+kpss.test(dat$f_p, null = "Level")
+kpss_f <- kpss.test(dat$f_p, null = c("Level", "Trend"))
+# reject null of stationarity => time series is non-stationary
+
+pp.test(dat$f_p)
+pp_f <- pp.test(dat$f_p)
+# fail to reject the null (stationary)=> non-stationarity
+
+
+adf.test(dat$w_p, k=24)
+adf.test(dat$w_p, k=12)
+adf.test(dat$w_p, k=6)
+adf.test(dat$w_p, k=4)
+adf.test(dat$w_p, k=2)
+adf_w <- adf.test(dat$w_p, k=4)
+# fail to reject the null (non-stat) for every lag => non-stationary
+
+kpss.test(dat$w_p, null = "Trend")
+kpss.test(dat$w_p, null = "Level")
+kpss_w <- kpss.test(dat$w_p, null = c("Level", "Trend"))
+# reject null of stationarity => non-stationary
 
 pp.test(dat$w_p)
-pp.test(dat$f_p)
+pp_w <- pp.test(dat$w_p)
+# fail to reject the null of non-stationary => non-stationarity
+
 
 # time series are non-stationary: take first differences
 dif_dat <- dat |>
@@ -257,38 +238,107 @@ dif_dat <- dat |>
   drop_na()
 
 # check for stationarity again
-adf.test(dif_dat$w_p, k = 2)
-adf.test(dif_dat$f_p, k = 2)
+adf.test(dif_dat$f_p, k = 4)
+adf.test(dif_dat$w_p, k = 4)
+adf_f_dif <- adf.test(dif_dat$f_p, k = 4)
+adf_w_dif <- adf.test(dif_dat$w_p, k = 4)
 
-pp.test(dif_dat$w_p)
+kpss.test(dif_dat$f_p)
+kpss.test(dif_dat$w_p)
+
+kpss_f_dif <- kpss.test(dif_dat$f_p, null = c("Level", "Trend"))
+kpss_w_dif <- kpss.test(dif_dat$w_p, null = c("Level", "Trend"))
+
 pp.test(dif_dat$f_p)
+pp.test(dif_dat$w_p)
 
-#test autocorrelations
-acf(dif_dat$w_p, lag.max = 20)
-acf(dif_dat$f_p, lag.max = 20)
+pp_f_dif <- pp.test(dif_dat$f_p)
+pp_w_dif <- pp.test(dif_dat$w_p)
 
-Box.test(dif_dat$w_p)
-Box.test(dif_dat$f_p)
-
-# the data contains significant autocorrelations
 
 # plot differenced prices
 plot_dif_w <- ggplot(dif_dat, aes(x = Date)) +
-  geom_line(aes(y = w_p), linewidth = 0.5) +
+  geom_line(aes(y = w_p), linewidth = 0.5, color = "orange") +
   #geom_hline(yintercept = 0, linetype = "dashed") +
   labs(y = "Wheat", x = NULL) +
-  theme_classic()
+  theme_minimal()
 
 plot_dif_f <- ggplot(dif_dat, aes(x = Date)) +
-  geom_line(aes(y = f_p), linewidth = 0.5) +
+  geom_line(aes(y = f_p), linewidth = 0.5, color = "blue") +
   #geom_hline(yintercept = 0, linetype = "dashed") +
   labs(y = "Fertilizer", x = NULL) +
-  theme_classic()
+  theme_minimal()
 
-# Stack vertically
 combined_dif_plots <- plot_dif_f / plot_dif_w
 combined_dif_plots
+
 # ggsave("3_Outputs/Fig_DifferencedPrices.pdf", plot = combined_dif_plots, width = 8, height = 6)
+
+combined_plots <- price_plot / combined_dif_plots
+combined_plots
+
+#ggsave("3_Outputs/Fig_CombinedPrices.pdf", plot = combined_plots, width = 10, height = 8)
+
+# cointegration test
+coint_test <- ca.jo(dat[, c("f_p", "w_p")], type = "trace", ecdet = "trend", K = 2)
+summary(coint_test)
+# weak evidence of cointegration at 10% level
+
+# summary statistics of differenced prices
+summary_price_table <- tibble(
+  Statistic = c("Mean", "SD", "Min", "Max", "Skew", "Kurtosis", "ADF test", 
+                "KPSS test", "PP test"),
+  CAN = c(mean(dat$f_p), 
+          sd(dat$f_p),
+          min(dat$f_p), 
+          max(dat$f_p),
+          skewness(dat$f_p), 
+          kurtosis(dat$f_p),
+          adf_f$statistic,
+          kpss_f$statistic,
+          pp_f$statistic
+        ),
+  Wheat = c(mean(dat$w_p), 
+            sd(dat$w_p),
+            min(dat$w_p), 
+            max(dat$w_p),
+            skewness(dat$w_p), 
+            kurtosis(dat$w_p),
+            adf_w$statistic,
+            kpss_w$statistic,
+            pp_w$statistic
+          ),
+  CAN_dif = c(mean(dif_dat$f_p), 
+          sd(dif_dat$f_p),
+          min(dif_dat$f_p), 
+          max(dif_dat$f_p),
+          skewness(dif_dat$f_p), 
+          kurtosis(dif_dat$f_p),
+          adf_f_dif$statistic,
+          kpss_f_dif$statistic,
+          pp_f_dif$statistic
+        ),
+  Wheat_dif = c(mean(dif_dat$w_p), 
+            sd(dif_dat$w_p),
+            min(dif_dat$w_p), 
+            max(dif_dat$w_p),
+            skewness(dif_dat$w_p), 
+            kurtosis(dif_dat$w_p),
+            adf_w_dif$statistic,
+            kpss_w_dif$statistic,
+            pp_w_dif$statistic
+          )
+        )
+
+summary_price_table <- summary_price_table %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+summary_price_table
+
+#write_csv(summary_price_table, "3_Outputs/Table_PriceSummary.csv")
+
+
+### Specify and Estimate VAR ####################################################
 
 # Create regression variables
 dat <- dif_dat %>%
@@ -301,30 +351,37 @@ dat <- dif_dat %>%
     f_p2 = lag(f_p, 2),
     f_p3 = lag(f_p, 3),
     f_p4 = lag(f_p, 4),
-    w_ps1 = w_p1^2, # squares
+    w_ps1 = w_p1^2,     # squares
     f_ps1 = f_p1^2
   ) |>
   drop_na()
 
-### Specify and Estimate VAR ####################################################
 
 vardat <- dat %>% dplyr::select(w_p, f_p)
 
 # lag selection
-VARselect(vardat, lag.max = 10, type = "const")$selection #SC (BIC): 1 lag
+VARselect(vardat, lag.max = 4, type = "const")
+# either 1 or 2 lags suggested by info criteria
 
 # estimate VAR
 var1 <- VAR(vardat, p = 1)
 summary(var1)
-roots(var1)
+serial.test(var1, lags.pt = 12, type = "PT.asymptotic")
+# Strong rejection of the null hypothesis - there is significant serial correlation
 
 var2 <- VAR(vardat, p = 2)
 summary(var2)
+serial.test(var2, lags.pt = 12, type = "PT.asymptotic")
 
 var3 <- VAR(vardat, p = 3)
 summary(var3)
+serial.test(var3, lags.pt = 12, type = "PT.asymptotic")
+# still strong rejection of the null hypothesis - there is significant serial correlation
 
-# choose 1 lag for parsimony but the model has poor fit
+# test for volatility clustering
+arch.test(var1)
+arch.test(var2)
+# VAR models assume constant variance - ARCH effects present
 
 # create time trends and seasonal dummies
 dat <- dat |>
@@ -340,11 +397,13 @@ dat <- dat |>
     month = as.numeric(format(Date, "%m")),
     day = as.numeric(format(Date, "%d")),
 
+    # quarterly dummies
     Q1 = ifelse(month %in% c(1, 2, 3), 1, 0),
     Q2 = ifelse(month %in% c(4, 5, 6), 1, 0),
     Q3 = ifelse(month %in% c(7, 8, 9), 1, 0),
     Q4 = ifelse(month %in% c(10, 11, 12), 1, 0),
 
+    # covid/ukraine war dummy
     D = ifelse(
       Date >= as.Date("2021-09-01") & Date <= as.Date("2023-09-01"),
       1,
@@ -354,92 +413,115 @@ dat <- dat |>
 
 
 # select lag with exogenous variables
-VARselect(vardat, lag.max = 4, exogen = cbind(dat[, c("w_ps1")]))$selection #SC: 1
-VARselect(vardat, lag.max = 4, exogen = cbind(dat[, c("f_ps1")]))$selection #SC: 1
+VARselect(vardat, lag.max = 4, type = "const")
+VARselect(vardat, lag.max = 4, exogen = cbind(dat[, c("w_ps1", "f_ps1")])) 
 VARselect(
   vardat,
   lag.max = 4,
-  exogen = cbind(dat[, c("w_ps1", "f_ps1")])
-)$selection #SC: 1
+  exogen = cbind(dat[, c("w_ps1", "f_ps1", "tt")])
+) 
+VARselect(
+  vardat,
+  lag.max = 4,
+  exogen = cbind(dat[, c("w_ps1", "f_ps1", "tt", "tt1")])
+) 
+VARselect(
+  vardat,
+  lag.max = 4,
+  exogen = cbind(dat[, c("w_ps1", "f_ps1", "tt", "tt1", "Q1", "Q2", "Q3")])
+) 
 VARselect(
   vardat,
   lag.max = 4,
   exogen = cbind(dat[, c("w_ps1", "f_ps1", "tt", "tt1", "Q1", "Q2", "Q3", "D")])
-)$selection #SC: 1
+) 
 
-
-# VAR with exogenous variables
-var1 <- VAR(
-  vardat,
-  p = 1,
-  exogen = dat[, c("w_ps1", "f_ps1", "tt", "tt1", "Q1", "Q2", "Q3", "D")]
-)
-summary(var1)
-
-var2 <- VAR(
-  vardat,
-  p = 2,
-  exogen = dat[, c("w_ps1", "f_ps1", "tt", "tt1", "Q1", "Q2", "Q3", "D")]
-)
-summary(var2)
-
-# choose 1 lag for parsimony still poor fit
-
-stargazer(
-  var1$varresult$w_p,
-  var1$varresult$f_p,
-  type = "text",
-  dep.var.labels = c("Wheat price change Fertilizer price change")
-)
+# best model according to AIC and BIC is p=1/2 with squared terms 
+# following JP we stay with the linear model as the squared specification 
+# does not produce a stable price simulation 
 
 
 ### Specify and Estimate QVAR ####################################################
 
-# define individual marginal specifications
-mw <- w_p ~ w_p1 + f_p1 + w_ps1 + f_ps1 + tt + tt1 + Q1 + Q2 + Q3 + D
-mf <- f_p ~ w_p1 + f_p1 + w_ps1 + f_ps1 + tt + tt1 + Q1 + Q2 + Q3 + D
+# define individual marginal specifications based on information criteria
+mf <- f_p ~ f_p1 + w_p1
+mw <- w_p ~ f_p1 + w_p1
 
-mw <- w_p ~ w_p1 + f_p1 + w_ps1
-mf <- f_p ~ w_p1 + f_p1 + f_ps1
+var_f <- lm(mf, data = dat) 
+summary(var_f)
+var_w <- lm(mw, data = dat)
+summary(var_w)
 
-summary(lm(mw, data = dat))
-summary(lm(mf, data = dat))
-
-
-# Calculate pseudo R^2s for QVAR
+# estimate QVARs for table 
 taus_sparse <- c(.1, .3, .5, .7, .9)
-psu_r2s <- data.frame()
-rho <- function(u, tau) sum(u * (tau - (u < 0))) #rho calc from JP code
+
+qvar_f <- rq(mf, tau = taus_sparse, data = dat)
+qvar_w <- rq(mw, tau = taus_sparse, data = dat)
+sum_qvar_f <- summary(qvar_f, se = "boot", brmethod = "xy")
+sum_qvar_w <- summary(qvar_w, se = "boot", brmethod = "xy")
+sum_qvar_f
+sum_qvar_w
+
+# Calculate pseudo R^2s for table (both wheat and fertilizer)
+
+psu_r2s_w <- data.frame()
+psu_r2s_f <- data.frame()
+rho <- function(u, tau) sum(u * (tau - (u < 0))) # rho calc from JP code
 
 for (tau in taus_sparse) {
-  fit <- rq(mw, tau = tau, data = dat) #fit the q reg for current tau
+  # wheat
+  fit_w <- rq(mw, tau = tau, data = dat)
+  y_w <- dat$w_p
+  yhat_w <- predict(fit_w, newdata = dat)
+  rho_m_w <- rho(y_w - yhat_w, tau)
+  rho0_w  <- rho(y_w - quantile(y_w, probs = tau), tau)
+  r2_w <- 1 - rho_m_w / rho0_w
+  psu_r2s_w <- rbind(psu_r2s_w, data.frame(tau = tau, pseudoR2 = r2_w))
 
-  y <- dat$w_p #actual values
-  yhat <- predict(fit) #predicted by model
-
-  # compute rho and rho0
-  rho_m <- rho(y - yhat, tau)
-  rho0 <- rho(y - quantile(y, probs = tau), tau)
-
-  r2 <- 1 - rho_m / rho0 #pseudo-R2
-
-  psu_r2s <- rbind(psu_r2s, data.frame(tau = tau, pseudoR2 = r2)) #store
+  # fertilizer
+  fit_f <- rq(mf, tau = tau, data = dat)
+  y_f <- dat$f_p
+  yhat_f <- predict(fit_f, newdata = dat)
+  rho_m_f <- rho(y_f - yhat_f, tau)
+  rho0_f  <- rho(y_f - quantile(y_f, probs = tau), tau)
+  r2_f <- 1 - rho_m_f / rho0_f
+  psu_r2s_f <- rbind(psu_r2s_f, data.frame(tau = tau, pseudoR2 = r2_f))
 }
-psu_r2s
 
-# model fit is terrible (psudoR2 close to 0) at all quantiles
+psu_r2s_f
+psu_r2s_w
 
-# QVARs
-qvar_w <- rq(mw, tau = taus_sparse, data = dat)
-qvar_f <- rq(mf, tau = taus_sparse, data = dat)
-sum_qvar_w <- summary(qvar_w, se = "boot", brmethod = "xy")
-sum_qvar_f <- summary(qvar_f, se = "boot", brmethod = "xy")
-sum_qvar_w
-sum_qvar_f
+
+# make table
+model_list_f <- list("VAR" = var_f)
+for (tau in taus_sparse) {
+  model_list_f[[paste0("", tau)]] <- rq(mf, tau = tau, data = dat)
+}
+
+model_list_w <- list("VAR" = var_w)
+for (tau in taus_sparse) {
+  model_list_w[[paste0("", tau)]] <- rq(mw, tau = tau, data = dat)
+}
+
+modelsummary(
+  model_list_f,
+  title = "Fertilizer Price",
+  output = "3_Outputs/Table_QVAR_FertPrices.csv",
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01)
+)
+
+modelsummary(
+  model_list_w,
+  title = "Wheat Price",
+  output = "3_Outputs/Table_QVAR_WheatPrices.csv",
+  stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01)
+)
+
+### full QVAR estimation #################################################
 
 taus_dense <- seq(0.01, 0.99, by = 0.01)
-fit_w <- rq(mw, tau = taus_dense, data = dat)
 fit_f <- rq(mf, tau = taus_dense, data = dat)
+fit_w <- rq(mw, tau = taus_dense, data = dat)
 
 coeff_w <- fit_w$coeff
 coeff_f <- fit_f$coeff
@@ -460,7 +542,7 @@ y_w <- t(apply(y_w, 1, cummax))
 y_f <- X %*% coeff_f
 y_f <- t(apply(y_f, 1, cummax))
 
-# Copula
+### Copula estimation #################################################
 n = nrow(vardat)
 
 F_w <- array(0, dim = c(n, 1))
@@ -478,8 +560,11 @@ for (ii in 1:n) {
 
 C <- F_w ~ F_f
 summary(lm(C))
+
 rC <- rq(C, tau = taus_sparse)
-summary(rC, se = "boot", brmethod = "xy")
+sum_rC <- summary(rC, se = "boot", brmethod = "xy")
+sum_rC
+
 rC_full <- rq(C, tau = taus_dense)
 coeff_rC <- rC_full$coeff
 
@@ -500,7 +585,7 @@ abline(h = 0, lty = 2)
 
 ### Price path simulation ###########################################################
 
-Nt <- 180 # number of periods to simulate (months)
+Nt <- 24 # number of periods to simulate (24 observations twice per month = 1 year)
 Ns <- 1000 # number of draws
 Ys <- array(0, dim = c(2, Nt, Ns))
 
