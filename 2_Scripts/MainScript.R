@@ -147,7 +147,9 @@ dat <- inner_join(w_data, f_data, by = "Date") |>
   # Remove pre-2009 obs. (monthly up until that point)
   filter(Date >= as.Date("2009-01-01")) |> 
   # Transform prices to €/kg
-  mutate(w_p = w_p / 100, f_p = f_p / 100)
+  #mutate(w_p = w_p / 100, f_p = f_p / 100) |> 
+  # take log prices
+  mutate(w_p = log(w_p), f_p = log(f_p))
 
 range(dat$Date)
 diff(dat$Date)
@@ -167,14 +169,13 @@ price_plot <- ggplot(dat, aes(x = Date)) +
     linewidth = 0.5
   ) +
   geom_line(aes(y = w_p, color = "Wheat price"), linewidth = 0.5) +
-  scale_y_continuous(limits = c(0, NA), expand = c(0, 0)) +
   scale_color_manual(
     values = c(
       "Calcium Ammonium Nitrate price" = "blue",
       "Wheat price" = "orange"
     )
   ) +
-  labs(y = "Price (€/kg)", x = NULL, color = NULL) +
+  labs(y = "Log of price (€/kg)", x = NULL, color = NULL) +
   theme_minimal() +
   theme(
     legend.position = c(0.1, 0.9),
@@ -341,7 +342,7 @@ summary_price_table
 ### Specify and Estimate VAR ####################################################
 
 # Create regression variables
-dat <- dif_dat %>%
+dif_dat <- dif_dat %>%
   mutate(
     w_p1 = lag(w_p, 1), # wheat lags
     w_p2 = lag(w_p, 2),
@@ -357,7 +358,7 @@ dat <- dif_dat %>%
   drop_na()
 
 
-vardat <- dat %>% dplyr::select(w_p, f_p)
+vardat <- dif_dat %>% dplyr::select(w_p, f_p)
 
 # lag selection
 VARselect(vardat, lag.max = 4, type = "const")
@@ -384,7 +385,7 @@ arch.test(var2)
 # VAR models assume constant variance - ARCH effects present
 
 # create time trends and seasonal dummies
-dat <- dat |>
+dif_dat <- dif_dat |>
   mutate(
     tt = 1:n(), # general time trend
     tt1 = ifelse(
@@ -414,26 +415,26 @@ dat <- dat |>
 
 # select lag with exogenous variables
 VARselect(vardat, lag.max = 4, type = "const")
-VARselect(vardat, lag.max = 4, exogen = cbind(dat[, c("w_ps1", "f_ps1")])) 
+VARselect(vardat, lag.max = 4, exogen = cbind(dif_dat[, c("w_ps1", "f_ps1")])) 
 VARselect(
   vardat,
   lag.max = 4,
-  exogen = cbind(dat[, c("w_ps1", "f_ps1", "tt")])
+  exogen = cbind(dif_dat[, c("w_ps1", "f_ps1", "tt")])
 ) 
 VARselect(
   vardat,
   lag.max = 4,
-  exogen = cbind(dat[, c("w_ps1", "f_ps1", "tt", "tt1")])
+  exogen = cbind(dif_dat[, c("w_ps1", "f_ps1", "tt", "tt1")])
 ) 
 VARselect(
   vardat,
   lag.max = 4,
-  exogen = cbind(dat[, c("w_ps1", "f_ps1", "tt", "tt1", "Q1", "Q2", "Q3")])
+  exogen = cbind(dif_dat[, c("w_ps1", "f_ps1", "tt", "tt1", "Q1", "Q2", "Q3")])
 ) 
 VARselect(
   vardat,
   lag.max = 4,
-  exogen = cbind(dat[, c("w_ps1", "f_ps1", "tt", "tt1", "Q1", "Q2", "Q3", "D")])
+  exogen = cbind(dif_dat[, c("w_ps1", "f_ps1", "tt", "tt1", "Q1", "Q2", "Q3", "D")])
 ) 
 
 # best model according to AIC and BIC is p=1/2 with squared terms 
@@ -444,19 +445,19 @@ VARselect(
 ### Specify and Estimate QVAR ####################################################
 
 # define individual marginal specifications based on information criteria
-mf <- f_p ~ f_p1 + w_p1
-mw <- w_p ~ f_p1 + w_p1
+mf <- f_p ~ f_p1 + w_p1  
+mw <- w_p ~ f_p1 + w_p1 
 
-var_f <- lm(mf, data = dat) 
+var_f <- lm(mf, data = dif_dat) 
 summary(var_f)
-var_w <- lm(mw, data = dat)
+var_w <- lm(mw, data = dif_dat)
 summary(var_w)
 
 # estimate QVARs for table 
 taus_sparse <- c(.1, .3, .5, .7, .9)
 
-qvar_f <- rq(mf, tau = taus_sparse, data = dat)
-qvar_w <- rq(mw, tau = taus_sparse, data = dat)
+qvar_f <- rq(mf, tau = taus_sparse, data = dif_dat)
+qvar_w <- rq(mw, tau = taus_sparse, data = dif_dat)
 sum_qvar_f <- summary(qvar_f, se = "boot", brmethod = "xy")
 sum_qvar_w <- summary(qvar_w, se = "boot", brmethod = "xy")
 sum_qvar_f
@@ -464,74 +465,73 @@ sum_qvar_w
 
 # Calculate pseudo R^2s for table (both wheat and fertilizer)
 
-psu_r2s_w <- data.frame()
-psu_r2s_f <- data.frame()
+psu_r2s_w <- numeric(length(taus_sparse))
+psu_r2s_f <- numeric(length(taus_sparse))
 rho <- function(u, tau) sum(u * (tau - (u < 0))) # rho calc from JP code
 
-for (tau in taus_sparse) {
+for (i in seq_along(taus_sparse)) {
+  tau <- taus_sparse[i]
+
   # wheat
-  fit_w <- rq(mw, tau = tau, data = dat)
-  y_w <- dat$w_p
-  yhat_w <- predict(fit_w, newdata = dat)
+  fit_w <- rq(mw, tau = tau, data = dif_dat)
+  y_w <- dif_dat$w_p
+  yhat_w <- predict(fit_w, newdata = dif_dat)
   rho_m_w <- rho(y_w - yhat_w, tau)
   rho0_w  <- rho(y_w - quantile(y_w, probs = tau), tau)
-  r2_w <- 1 - rho_m_w / rho0_w
-  psu_r2s_w <- rbind(psu_r2s_w, data.frame(tau = tau, pseudoR2 = r2_w))
+  psu_r2s_w[i] <- 1 - rho_m_w / rho0_w
 
   # fertilizer
-  fit_f <- rq(mf, tau = tau, data = dat)
-  y_f <- dat$f_p
-  yhat_f <- predict(fit_f, newdata = dat)
+  fit_f <- rq(mf, tau = tau, data = dif_dat)
+  y_f <- dif_dat$f_p
+  yhat_f <- predict(fit_f, newdata = dif_dat)
   rho_m_f <- rho(y_f - yhat_f, tau)
   rho0_f  <- rho(y_f - quantile(y_f, probs = tau), tau)
-  r2_f <- 1 - rho_m_f / rho0_f
-  psu_r2s_f <- rbind(psu_r2s_f, data.frame(tau = tau, pseudoR2 = r2_f))
+  psu_r2s_f[i] <- 1 - rho_m_f / rho0_f
 }
 
-psu_r2s_f
-psu_r2s_w
-
+round(psu_r2s_f, 3)
+round(psu_r2s_w, 3)
 
 # make table
 model_list_f <- list("VAR" = var_f)
 for (tau in taus_sparse) {
-  model_list_f[[paste0("", tau)]] <- rq(mf, tau = tau, data = dat)
+  model_list_f[[paste0("", tau)]] <- rq(mf, tau = tau, data = dif_dat)
 }
 
 model_list_w <- list("VAR" = var_w)
 for (tau in taus_sparse) {
-  model_list_w[[paste0("", tau)]] <- rq(mw, tau = tau, data = dat)
+  model_list_w[[paste0("", tau)]] <- rq(mw, tau = tau, data = dif_dat)
 }
 
 modelsummary(
   model_list_f,
   title = "Fertilizer Price",
-  output = "3_Outputs/Table_QVAR_FertPrices.csv",
+  output = "3_Outputs/Table_QVAR(1)_FertPrices.csv",
   stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01)
 )
 
 modelsummary(
   model_list_w,
   title = "Wheat Price",
-  output = "3_Outputs/Table_QVAR_WheatPrices.csv",
+  output = "3_Outputs/Table_QVAR(1)_WheatPrices.csv",
   stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01)
 )
 
 ### full QVAR estimation #################################################
 
 taus_dense <- seq(0.01, 0.99, by = 0.01)
-fit_f <- rq(mf, tau = taus_dense, data = dat)
-fit_w <- rq(mw, tau = taus_dense, data = dat)
+fit_f <- rq(mf, tau = taus_dense, data = dif_dat)
+fit_w <- rq(mw, tau = taus_dense, data = dif_dat)
 
 coeff_w <- fit_w$coeff
 coeff_f <- fit_f$coeff
 
 # Independent variables
-w_p <- dat$w_p
-w_p1 <- dat$w_p1
+w_p <- dif_dat$w_p
+w_p1 <- dif_dat$w_p1
 
-f_p <- dat$f_p
-f_p1 <- dat$f_p1
+f_p <- dif_dat$f_p
+f_p1 <- dif_dat$f_p1
 
 X <- cbind(1, w_p1, f_p1) #col of 1s for b0
 
@@ -556,7 +556,6 @@ for (ii in 1:n) {
     min(abs(f_p[ii] - y_f[ii, ])) == abs(f_p[ii] - y_f[ii, ])
   ))]
 }
-
 
 C <- F_w ~ F_f
 summary(lm(C))
@@ -585,70 +584,100 @@ abline(h = 0, lty = 2)
 
 ### Price path simulation ###########################################################
 
+n_dif <- nrow(dif_dat)
+n_lev <- nrow(dat)
+
 Nt <- 24 # number of periods to simulate (24 observations twice per month = 1 year)
 Ns <- 1000 # number of draws
-Ys <- array(0, dim = c(2, Nt, Ns))
 
-# Set initial conditions
-Ys[1, , ] <- dat$f_p[n] # get last price of fertilizer
-Ys[2, , ] <- dat$w_p[n] # get last price of wheat
+Ys_changes <- array(0, dim = c(2, Nt, Ns))
+Ys_levels <- array(0, dim = c(2, Nt, Ns))
+
+Ys_changes[1, 1, ] <- dif_dat$f_p[n_dif]    # last observed fertilizer change at t=1
+Ys_changes[2, 1, ] <- dif_dat$w_p[n_dif]    # last observed wheat change at t=1
+
+# set initial level (only at time 1)
+Ys_levels[1, 1, ] <- dat$f_p[n_lev]         # last observed fertilizer level
+Ys_levels[2, 1, ] <- dat$w_p[n_lev]         # last observed wheat level
 
 # QVAR Simulation
-for (it in (3:Nt)) {
-  for (is in (1:Ns)) {
-    f_pi1 <- Ys[1, it - 1, is]
-    w_pi1 <- Ys[2, it - 1, is]
+for (it in 2:Nt) {
+  for (is in 1:Ns) {
+    f_change1 <- Ys_changes[1, it - 1, is]
+    w_change1 <- Ys_changes[2, it - 1, is]
 
-    Xfi <- cbind(1, f_pi1, w_pi1)
-    Xwi <- cbind(1, f_pi1, w_pi1)
+    Xfi <- cbind(1, f_change1, w_change1) # matches mf: intercept, f_p1, w_p1
+    Xwi <- cbind(1, f_change1, w_change1) # matches mw: intercept, f_p1, w_p1
 
     qi <- sample(1:99, 1)
 
-    yf <- Xfi %*% coeff_f[, qi]
+    yf_change <- Xfi %*% coeff_f[, qi]
+    yw_change <- Xwi %*% coeff_w[, qi]
 
-    yw <- Xwi %*% coeff_w[, qi]
+    Ys_changes[1, it, is] <- yf_change
+    Ys_changes[2, it, is] <- yw_change
 
-    Ys[1, it, is] <- yf
-    Ys[2, it, is] <- yw
+    # convert to level using cumulative sum
+    Ys_levels[1, it, is] <- dat$f_p[n_lev] + sum(Ys_changes[1, 1:it, is])
+    Ys_levels[2, it, is] <- dat$w_p[n_lev] + sum(Ys_changes[2, 1:it, is])
   }
 }
 
-# plot simulated paths
-ggplot() +
-  geom_line(aes(x = 1:Nt, y = Ys[1, , 1]), color = "blue", alpha = 0.5) +
-  geom_line(aes(x = 1:Nt, y = Ys[1, , 2]), color = "blue", alpha = 0.5) +
-  geom_line(aes(x = 1:Nt, y = Ys[1, , 3]), color = "blue", alpha = 0.5) +
-  labs(y = "Fertilizer Price Change (€/100 kg)", x = "Time Period") +
-  theme_minimal()
-
-# Reshape data for ggplot
-plot_data <- data.frame(
+# Reshape data for plotting
+simulated_prices <- data.frame(
   time = rep(1:Nt, Ns),
-  price = as.vector(Ys[1, , ]),
+  price_f = as.vector(Ys_levels[1, , ]),
+  price_w = as.vector(Ys_levels[2, , ]),
   simulation = rep(1:Ns, each = Nt)
 )
 
-ggplot(plot_data, aes(x = time, y = price, group = simulation)) +
+ggplot(plot_data, aes(x = time, y = price_f, group = simulation)) +
   geom_line(color = "blue", alpha = 0.5) +
-  labs(y = "Fertilizer Price Change (€/100 kg)", x = "Time Period") +
+  labs(y = "Log of Fertilizer Price", x = "Time Period") +
   theme_minimal()
+
+ggplot(plot_data, aes(x = time, y = price_w, group = simulation)) +
+  geom_line(color = "orange", alpha = 0.5) +
+  labs(y = "Log of Wheat Price", x = "Time Period") +
+  theme_minimal()
+
+
+ggplot() +
+  geom_density(data = simulated_prices, aes(x = price_f), color = "red", size = 1) +
+  geom_density(data = dat, aes(x = f_p), color = "blue", size = 1, alpha = 0.5) +
+  labs(x = "Fertilizer Price (€/kg)", y = "Density") +
+  theme_minimal() +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  ggtitle("Density of Historical vs Simulated Fertilizer Prices") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot() +
+  geom_density(data = simulated_prices, aes(x = price_w), color = "red", size = 1) +
+  geom_density(data = dat, aes(x = w_p), color = "blue", size = 1, alpha = 0.5) +
+  labs(x = "Fertilizer Price (€/kg)", y = "Density") +
+  theme_minimal() +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  ggtitle("Density of Historical vs Simulated Fertilizer Prices") +
+  theme(plot.title = element_text(hjust = 0.5))
+
 
 ### Insurance Contract Price ###########################################################
 
-nitrogen_prices <- Ys[1, 1:Nt, ] # Extract nitrogen price paths
+nitrogen_prices <- Ys_levels[1, 1:Nt, ] # Extract nitrogen price paths
 
-duration <- 12 # contract duration in months
-k1 <- 50 # strike price
-amount <- 100 # Notional amount (e.g., tons of nitrogen)
+# Contract parameters
+duration <- 12 # contract duration (biweekly periods: 12 = 6 months)
+# strike prices
+k1 <- mean(dat$f_p) + sd(dat$f_p)
+k2 <- mean(dat$f_p) + 1.5 * sd(dat$f_p)
+amount <- 100 # Notional amount 
+int <- 0.03   # Interest rate
+disc <- (1 + int)**(-(1:Nt / 12)) # Monthly discount factors
 
 payoffs_call <- array(0, dim = c(Nt, Ns))
 for (it in 1:Nt) {
   payoffs_call[it, ] <- pmax(nitrogen_prices[it, ] - k1, 0) * amount
 }
-
-# Calculate Present Values
-int <- 0.03 # Interest rate
-disc <- (1 + int)**(-(1:Nt / 12)) # Monthly discount factors
 
 # Discounted payoffs
 disc_cal_payoffs <- array(0, dim = c(Nt, Ns))
