@@ -144,12 +144,9 @@ unique(diff(w_data$Date))
 dat <- inner_join(w_data, f_data, by = "Date") |>
   rename(w_p = Avg_Price.x, f_p = Avg_Price.y) |>
   dplyr::select(Date, w_p, f_p) |>
-  # Remove pre-2009 obs. (monthly up until that point)
-  filter(Date >= as.Date("2009-01-01")) |> 
-  # Transform prices to €/kg
-  #mutate(w_p = w_p / 100, f_p = f_p / 100) |> 
-  # take log prices
-  mutate(w_p = log(w_p), f_p = log(f_p))
+  filter(Date >= as.Date("2009-01-01")) |>       # Remove pre-2009 obs. (monthly up until that point)
+  #mutate(w_p = w_p / 100, f_p = f_p / 100) |>    # Transform prices to €/kg
+  mutate(w_p = log(w_p), f_p = log(f_p))         # Log prices
 
 range(dat$Date)
 diff(dat$Date)
@@ -587,7 +584,7 @@ abline(h = 0, lty = 2)
 n_dif <- nrow(dif_dat)
 n_lev <- nrow(dat)
 
-Nt <- 24 # number of periods to simulate (24 observations twice per month = 1 year)
+Nt <- 72 # number of periods to simulate (24 observations twice per month = 1 year)
 Ns <- 1000 # number of draws
 
 Ys_changes <- array(0, dim = c(2, Nt, Ns))
@@ -631,64 +628,134 @@ simulated_prices <- data.frame(
   simulation = rep(1:Ns, each = Nt)
 )
 
-ggplot(plot_data, aes(x = time, y = price_f, group = simulation)) +
+ggplot(simulated_prices, aes(x = time, y = price_f, group = simulation)) +
   geom_line(color = "blue", alpha = 0.5) +
   labs(y = "Log of Fertilizer Price", x = "Time Period") +
   theme_minimal()
 
-ggplot(plot_data, aes(x = time, y = price_w, group = simulation)) +
+ggplot(simulated_prices, aes(x = time, y = price_w, group = simulation)) +
   geom_line(color = "orange", alpha = 0.5) +
   labs(y = "Log of Wheat Price", x = "Time Period") +
   theme_minimal()
 
+density_plot_f <- ggplot() +
+    geom_density(data = simulated_prices, aes(x = price_f, fill = "Simulated"), alpha = 0.5) +
+    geom_density(data = dat, aes(x = f_p, fill = "Historical"), alpha = 0.4) +
+    scale_fill_manual(
+        name = NULL, 
+        values = c("Simulated" = "#E41A1C", "Historical" = "#377EB8")) +
+    labs(
+        x = paste0("\n N = ", nrow(simulated_prices)),
+        y = "Density \n",
+        title = "CAN Price Distribution") +
+    theme_minimal() + 
+    theme(
+        legend.position = c(0.85, 0.85),
+        legend.background = element_rect(fill = "white", color = "black"),  
+        panel.grid.major.x = element_blank(), 
+        panel.grid.minor = element_blank()    
+    )
 
-ggplot() +
-  geom_density(data = simulated_prices, aes(x = price_f), color = "red", size = 1) +
-  geom_density(data = dat, aes(x = f_p), color = "blue", size = 1, alpha = 0.5) +
-  labs(x = "Fertilizer Price (€/kg)", y = "Density") +
-  theme_minimal() +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
-  ggtitle("Density of Historical vs Simulated Fertilizer Prices") +
-  theme(plot.title = element_text(hjust = 0.5))
+density_plot_w <- ggplot() +
+    geom_density(data = simulated_prices, aes(x = price_w, fill = "Simulated"), alpha = 0.5) +
+    geom_density(data = dat, aes(x = w_p, fill = "Historical"), alpha = 0.4) +
+    scale_fill_manual(
+        name = NULL, 
+        values = c("Simulated" = "#E41A1C", "Historical" = "#377EB8")) +
+    labs(
+        x = paste0("\n N = ", nrow(simulated_prices)),
+        y = "Density \n",
+        title = "Wheat Price Distribution") +
+    theme_minimal() + 
+    theme(
+        legend.position = c(0.85, 0.85),
+        legend.background = element_rect(fill = "white", color = "black"),  
+        panel.grid.major.x = element_blank(), 
+        panel.grid.minor = element_blank()    
+    )
 
-ggplot() +
-  geom_density(data = simulated_prices, aes(x = price_w), color = "red", size = 1) +
-  geom_density(data = dat, aes(x = w_p), color = "blue", size = 1, alpha = 0.5) +
-  labs(x = "Fertilizer Price (€/kg)", y = "Density") +
-  theme_minimal() +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
-  ggtitle("Density of Historical vs Simulated Fertilizer Prices") +
-  theme(plot.title = element_text(hjust = 0.5))
+density_plot_f
+density_plot_w
+
+#ggsave("3_Outputs/Fig_PriceDensity_CAN.pdf", plot = density_plot_f, width = 10, height = 6)
+#ggsave("3_Outputs/Fig_PriceDensity_Wheat.pdf", plot = density_plot_w, width = 10, height = 6)
+
 
 
 ### Insurance Contract Price ###########################################################
 
-nitrogen_prices <- Ys_levels[1, 1:Nt, ] # Extract nitrogen price paths
-
+# historical nitrogen prices
+hist_f_p <- f_data |> 
+  filter(Date >= as.Date("2009-01-01")) |> 
+  dplyr::select(Date, Avg_Price) |> 
+  mutate(t = row_number(),
+         year = as.numeric(format(Date, "%Y")),
+         month = as.numeric(format(Date, "%m")),
+         year_index = year - min(year) + 1,
+         f_p = Avg_Price/100 # convert to €/kg
+         )
+         
 # Contract parameters
-duration <- 12 # contract duration (biweekly periods: 12 = 6 months)
-# strike prices
-k1 <- mean(dat$f_p) + sd(dat$f_p)
-k2 <- mean(dat$f_p) + 1.5 * sd(dat$f_p)
-amount <- 100 # Notional amount 
-int <- 0.03   # Interest rate
-disc <- (1 + int)**(-(1:Nt / 12)) # Monthly discount factors
+obs_per_year <- 24         # number of observations per year
+exercise_time <- 5         # exercise in early march                           
+int <- 0.03                # Interest rate
+T_years <- 0.6          # time to maturity (6 months)
 
-payoffs_call <- array(0, dim = c(Nt, Ns))
-for (it in 1:Nt) {
-  payoffs_call[it, ] <- pmax(nitrogen_prices[it, ] - k1, 0) * amount
-}
 
-# Discounted payoffs
-disc_cal_payoffs <- array(0, dim = c(Nt, Ns))
-for (it in 1:Nt) {
-  disc_cal_payoffs[it, ] <- payoffs_call[it, ] * disc[it]
-}
+# define strike prices (5 contracts from median to max price)
+min_test_price <- quantile(hist_f_p$f_p, 0.5)
+max_test_price <- max(hist_f_p$f_p)
+max_prices <- seq(min_test_price, max_test_price, length.out = 5) 
 
-# Average Discounted Payoff
-contract_price <- mean(disc_cal_payoffs)
+# calculates option payoffs 
+hist_f_p$k1 <- max_prices[1]  # select strike price
 
-contract_price
+# flag exercise times
+hist_f_p$exercise <- hist_f_p$t == exercise_time + obs_per_year * (hist_f_p$year_index - 1)
+
+# calculate payoffs
+hist_f_p$payoff <- ifelse(
+  hist_f_p$exercise,
+  pmax(0, hist_f_p$f_p - hist_f_p$k1),
+  0
+)
+
+# calculate spot cost (if no contract purchased)
+hist_f_p$spot_price <- ifelse(
+  hist_f_p$exercise,
+  hist_f_p$f_p,
+  0
+)
+
+# calculate contract cost (if contract purchased)
+hist_f_p$contract_cost <- ifelse(
+  hist_f_p$exercise,
+  pmin(hist_f_p$f_p, hist_f_p$k1),
+  0
+)
+
+# Calculate discount factor 
+discount_factor <- 1 / (1 + int)^T_years
+
+# Apply the fixed discount factor to the annual payoff
+hist_f_p$discounted_payoff <- hist_f_p$payoff * discount_factor
+
+
+# filter exercise data
+exercise_data <- hist_f_p |>
+dplyr::filter(exercise == TRUE) |> 
+dplyr::select(year, spot_price, contract_cost, payoff, discounted_payoff)
+
+exercise_data
+
+# final price calculation
+option_premium <- mean(exercise_data$discounted_payoff)
+
+option_premium
+
+#write_csv(exercise_data, "3_Outputs/Table_ContractPayoff.csv")
+
+
 
 #------- Analytical contract price calc (currently based on simple GBM) ----------
 params <- list(
