@@ -584,7 +584,7 @@ abline(h = 0, lty = 2)
 n_dif <- nrow(dif_dat)
 n_lev <- nrow(dat)
 
-Nt <- 72 # number of periods to simulate (24 observations twice per month = 1 year)
+Nt <- 24 # number of periods to simulate (24 observations twice per month = 1 year)
 Ns <- 1000 # number of draws
 
 Ys_changes <- array(0, dim = c(2, Nt, Ns))
@@ -699,62 +699,51 @@ hist_f_p <- f_data |>
 obs_per_year <- 24         # number of observations per year
 exercise_time <- 5         # exercise in early march                           
 int <- 0.03                # Interest rate
-T_years <- 0.6          # time to maturity (6 months)
+T_years <- 0.6             # time to maturity (6 months)
+discount_factor <- 1 / (1 + int)^T_years
 
-
-# define strike prices (5 contracts from median to max price)
-min_test_price <- quantile(hist_f_p$f_p, 0.5)
-max_test_price <- max(hist_f_p$f_p)
-max_prices <- seq(min_test_price, max_test_price, length.out = 5) 
-
-# calculates option payoffs 
-hist_f_p$k1 <- max_prices[1]  # select strike price
+# define strike prices
+max_prices <- quantile(hist_f_p$f_p, probs = c(0.5, 0.6, 0.7, 0.8, 0.9))
 
 # flag exercise times
 hist_f_p$exercise <- hist_f_p$t == exercise_time + obs_per_year * (hist_f_p$year_index - 1)
 
-# calculate payoffs
-hist_f_p$payoff <- ifelse(
-  hist_f_p$exercise,
-  pmax(0, hist_f_p$f_p - hist_f_p$k1),
-  0
+# Initialize results data frame
+premium_results <- data.frame(
+  strike_price = numeric(),
+  option_premium = numeric()
 )
 
-# calculate spot cost (if no contract purchased)
-hist_f_p$spot_price <- ifelse(
-  hist_f_p$exercise,
-  hist_f_p$f_p,
-  0
-)
+# Loop through each strike price
+for (i in 1:length(max_prices)) {
+  strike <- max_prices[i]
+  
+  # Calculate payoffs for this strike price
+  hist_f_p$payoff <- ifelse(
+    hist_f_p$exercise,
+    pmax(0, hist_f_p$f_p - strike),
+    0
+  )
+  
+  # Apply discount factor
+  hist_f_p$discounted_payoff <- hist_f_p$payoff * discount_factor
+  
+  # Calculate option premium
+  premium <- mean(hist_f_p[hist_f_p$exercise, ]$discounted_payoff)
+  
+  # Store results
+  premium_results <- rbind(
+    premium_results,
+    data.frame(strike_price = strike, option_premium = premium)
+  )
+}
 
-# calculate contract cost (if contract purchased)
-hist_f_p$contract_cost <- ifelse(
-  hist_f_p$exercise,
-  pmin(hist_f_p$f_p, hist_f_p$k1),
-  0
-)
+premium_results <- premium_results |>
+  mutate(across(where(is.numeric), ~ round(.x, 2)))
 
-# Calculate discount factor 
-discount_factor <- 1 / (1 + int)^T_years
+premium_results
 
-# Apply the fixed discount factor to the annual payoff
-hist_f_p$discounted_payoff <- hist_f_p$payoff * discount_factor
-
-
-# filter exercise data
-exercise_data <- hist_f_p |>
-dplyr::filter(exercise == TRUE) |> 
-dplyr::select(year, spot_price, contract_cost, payoff, discounted_payoff)
-
-exercise_data
-
-# final price calculation
-option_premium <- mean(exercise_data$discounted_payoff)
-
-option_premium
-
-#write_csv(exercise_data, "3_Outputs/Table_ContractPayoff.csv")
-
+#write_csv(premium_results, "3_Outputs/Table_ContractPayoff.csv")
 
 
 #------- Analytical contract price calc (currently based on simple GBM) ----------
@@ -814,10 +803,57 @@ f_star
 # 4. MONTE CARLO SIMULATION OF UTILITY OF PROFITS FUNCTIONS
 ################################################################################
 
-### 4.1 Broad framing ###########################################################
+### Calculate profits ##########################################################
 
-# 4.1.1 Expected Utility Theory (EUT)
+# Parameters
+N <- 200             # amount of N applied
+CAN <- N/0.27        # amount of CAN (27% N)
 
+# get results from production function regression
+coeff_0_yield <- yield_function$coefficients[1]
+coeff_1_yield <- yield_function$coefficients[2]
+coeff_2_yield <- yield_function$coefficients[3]
+
+predicted_yield <- coeff_0_yield + coeff_1_yield*sqrt(N) + coeff_2_yield*N
+
+# get results from variation function regression
+coeff_0_varf <- variation_function$coefficients[1]
+coeff_1_varf <- variation_function$coefficients[2]
+
+predicted_sigma_yield <- coeff_0_varf + coeff_1_varf*sqrt(N)
+
+stochastic_error <- rnorm(n = length(Ys_levels), mean = 0, sd = predicted_sigma_yield)
+
+simulated_yield <- predicted_yield + stochastic_error
+
+# get simulated prices and exp (log of prices -> prices)
+sim_f_p = exp(as.vector(Ys_levels[1, , ])) / 1000
+sim_w_p = exp(as.vector(Ys_levels[2, , ]))
+
+# Calculate Profit
+simulated_profit <- (sim_w_p * simulated_yield) - (sim_f_p * CAN)
+
+# plot simulated profits density distribution
+df_simulated_profit <- as.data.frame(simulated_profit)
+ggplot(df_simulated_profit, aes(x = simulated_profit)) +
+  geom_density(fill = "skyblue", alpha = 0.5) +
+  labs(title = "Density Distribution of Simulated Profit",
+       x = "Simulated Profit",
+       y = "Density") +
+  theme_minimal()
+
+### Broad framing ###########################################################
+
+# Expected Utility Theory (EUT) 
+
+delta <- 2        # risk aversion
+
+expected_profit <- mean(simulated_profit)  
+variance_profit <- var(simulated_profit)   
+sd_profit <- sd(simulated_profit)
+
+utility_CE <- expected_profit - ((delta / 2) * variance_profit)/expected_profit
+  
 # 4.1.2 Cumulative Prospect Theory (CPT)
 
 # 4.1.3 Ambiguity Aversion (Alpha model)
