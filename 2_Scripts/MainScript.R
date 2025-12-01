@@ -575,6 +575,61 @@ plot(
 )
 abline(h = 0, lty = 2)
 
+# ----- Stability analysis ----
+ntau <- length(taus_sparse)
+ncof <- ncol(X)
+bootreps <- 1000
+
+rqbs  <- array(0, dim = c(2, ntau, bootreps, ncof))
+Rev   <- array(0, dim = c(bootreps, ntau, ntau))
+MRev  <- array(0, dim = c(bootreps, ntau, ntau))
+res   <- array(0, dim = c(ntau, ntau))
+qMRev <- array(0, dim = c(3, ntau, ntau))
+
+
+# bootstrap quantile regressions
+for (i in 1:ntau) {
+  
+  # Fertilizer
+  rqbs[1, i, , ] <- boot.rq(
+    y = dif_dat$f_p,
+    x = X,
+    tau = taus_sparse[i],
+    R = bootreps
+  )$B
+  
+  # Wheat
+  rqbs[2, i, , ] <- boot.rq(
+    y = dif_dat$w_p,
+    x = X,
+    tau = taus_sparse[i],
+    R = bootreps
+  )$B
+  
+}
+
+# ---- Projection matrix ----
+for (f in 1:ntau) {
+  for (w in 1:ntau) {
+    for (r in 1:bootreps) {
+      
+      PM <- rbind(
+        c(rqbs[1, f, r, 2], rqbs[1, f, r, 3]), # fert eq
+        c(rqbs[2, w, r, 2], rqbs[2, w, r, 3])  # wheat eq
+      )
+      
+      ev <- eigen(PM)$values
+      Rev[r, f, w]  <- ev[1]
+      MRev[r, f, w] <- Mod(ev[1])
+    }
+    
+    res[f, w]       <- mean(Rev[, f, w])
+    qMRev[, f, w]   <- quantile(MRev[, f, w], c(0.9, 0.95, 0.99))
+  }
+}
+
+# Test stability at tau = 0.5,0.5
+t.test(MRev[, 3, 3], mu = 1)
 ################################################################################
 # 3. ADJUSTED CONTRACT PRICING
 ################################################################################
@@ -746,58 +801,32 @@ premium_results
 #write_csv(premium_results, "3_Outputs/Table_ContractPayoff.csv")
 
 
-#------- Analytical contract price calc (currently based on simple GBM) ----------
+#------- Contract price match ----------
 params <- list(
-  n <- 10000,       # number of simulated paths
-  t <- 10,         # total years
-  dt <- 1/12,            # monthly steps
-  mu <- 0.0,             # drift
-  sigma <- 0.5,          # volatility
-  s0 <- 200,               # starting price
-  p_cap <- 200,          # price cap
-  r <- 0.05             # annual discount rate
-) #temporary, estimate based on data etc.
+  T_years = T_years,
+  s0 = 200,
+  discount_factor = discount_factor
+)
 
-#Expected cost of adjusted contract 
-price_ceiling_cost <- function(params){
-  with(params, {
-    t_vec <- seq(dt, t, by = dt)
-    
-    #black-scholes
-    d1P <- (log(s0 / p_cap) + (mu + 0.5 * sigma^2) * t_vec) / (sigma * sqrt(t_vec))
-    d2P <- d1P - sigma * sqrt(t_vec)
-    
-    cost_t <- s0 * exp(mu * t_vec) * pnorm(d1P) - p_cap * pnorm(d2P)
-    cost_PV <- exp(-r * t_vec) * cost_t
-    
-    sum(cost_PV)
-  })
+ST <- hist_f_p[hist_f_p$exercise, ]$f_p
+
+forward_cost <- function(params, F, ST) {
+  mean(ST - F) * params$discount_factor
 }
 
-# Expected cost of forward contract
-forward_cost <- function(params, f) {
-  with(params, {
-    t_vec <- seq(dt, t, by = dt)
-    E_P_t <- s0 * exp(mu * t_vec)
-    cost_t <- E_P_t - f
-    sum(exp(-r * t_vec) * cost_t)
-  })
-}
-
-#Finds the cost-equal forward contract (based on adj contract cost)
-cost_equal <- function(params) {
+cost_equal <- function(params, target_cost, ST) {
   
-  target_cost <- price_ceiling_cost(params) #finds cost of adj contract
-  
-  cost_diff <- function(f) {
-    forward_cost(params, f) - target_cost
+  cost_diff <- function(F) {
+    forward_cost(params, F, ST) - target_cost
   }
   
-  uniroot(cost_diff, lower = 0, upper = 2000)$root #forward contract price where both contract are cost equivalent
+  uniroot(cost_diff, lower = 0, upper = 2000)$root
 }
 
-f_star <- cost_equal(params)
-f_star
+premium_results$forward_price_equivalent <- sapply(
+  premium_results$option_premium,
+  function(p) cost_equal(params, p, ST)
+)
 
 ################################################################################
 # 4. MONTE CARLO SIMULATION OF UTILITY OF PROFITS FUNCTIONS
