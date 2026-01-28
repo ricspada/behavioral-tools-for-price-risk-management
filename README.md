@@ -1,6 +1,6 @@
-# Behavioral Input Price Risk Management
+# Behavioral Price Risk Management
 
-This repository contains the data and R code for the research on "Behavioral Input Price Risk Management". The analysis focuses on the nitrogen-yield relationship, price dynamics between wheat and fertilizer (CAN), and contract payoff simulations.
+This repository contains the data and R code for Deliverable 5.4 of the [AgEnRes](https://agenres.eu/) project "Development of Input Price Risk Management Tools".
 
 ## Project Structure
 
@@ -8,16 +8,16 @@ The repository is organized as follows:
 
 - **1_Data/**
   - **RawData/**
-    - PPI_Cereals_Germany.xlsx      Producer Price Index for cereals in Germany.
-    - PPI_Fertilizers_Germany.xlsx  Producer Price Index for fertilizers in Germany.
-  - `EPIC.csv`                      EPIC crop simulation model outputs.
-  - `FertilizerPrices.csv`          Historical fertilizer price data.
-  - `WheatPrices.csv`               Historical wheat price data.
+    - `PPI_Cereals_Germany.xlsx`      Producer Price Index for cereals in Germany.
+    - `PPI_Fertilizers_Germany.xlsx`  Producer Price Index for fertilizers in Germany.
+  - `EPIC.csv`                        EPIC crop simulation model outputs.
+  - `FertilizerPrices.csv`            Historical fertilizer price data.
+  - `WheatPrices.csv`                 Historical wheat price data.
+   
+- **2_Scripts/**                  
+  - `MainScript.R`                    The core analytical script.
   
-- **2_Scripts/**  
-  - `MainScript.R`                  The core analytical script.
-  
-- **3_Outputs/**                    Generated outputs from the scripts.
+- **3_Outputs/**                      Generated outputs from the scripts.
 
 ## Prerequisities
 
@@ -40,11 +40,7 @@ install.packages(c(
 
 ## Usage
 
-- **(RStudio only) Open R project** Double click on the file "behavioral-input-price-risk-management.Rproj".
-
-- **(Optional) Data Preparation**: The data in "1_Data/" should be ready for analysis. If you need to regenerate the cleaned datasets from raw sources, run:
-    - "2_Scripts/CropSimulation_Cleaning.R"
-    - "2_Scripts/PriceData_Cleaning.R"
+- **(RStudio only) Open R project**: Double click on the file "behavioral-input-price-risk-management.Rproj".
 
 - **Main Analysis**: Run "2_Scripts/MainScript.R" to reproduce the main results.
 
