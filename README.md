@@ -36,16 +36,16 @@ install.packages(c(
   "urca",
   "moments",
   "RColorBrewer"
-))
-```
 
 ## Usage
 
-1.  **(Optional) Data Preparation**: The data in `1_Data/` should be ready for analysis. If you need to regenerate the cleaned datasets from raw sources, run:
-    - `2_Scripts/CropSimulation_Cleaning.R`
-    - `2_Scripts/PriceData_Cleaning.R`
+- **(RStudio only) Open R project** Double click on the file "behavioral-input-price-risk-management.Rproj".
 
-2.  **Main Analysis**: Run `2_Scripts/MainScript.R` to reproduce the main results.
+- **(Optional) Data Preparation**: The data in "1_Data/" should be ready for analysis. If you need to regenerate the cleaned datasets from raw sources, run:
+    - "2_Scripts/CropSimulation_Cleaning.R"
+    - "2_Scripts/PriceData_Cleaning.R"
+
+- **Main Analysis**: Run "2_Scripts/MainScript.R" to reproduce the main results.
 
 ## Contact
 
