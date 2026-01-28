@@ -1,4 +1,13 @@
+# R user files
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
+
+# Others 
+2_Scripts/example_code/
+2_Scripts/scrap.R
+2_Scripts/contract_payoff.R
+4_Documents/
+
+

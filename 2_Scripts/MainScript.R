@@ -1,4 +1,16 @@
-rm(list = ls()) # clean environment
+###########################################################################################
+#
+# R script for the publication: 
+#
+# Authors
+# Paper
+# Journal
+#
+# Last modified:
+# 
+# Contact: riccardo.spada@wur.nl
+# 
+# #########################################################################################
 
 # Load required libraries
 library(quantreg)
@@ -13,14 +25,17 @@ library(urca)
 library(moments)
 library(RColorBrewer)
 
-# Set seed for reproducibility
+# Set seed for replicability
 set.seed(1234)
 
-################################################################################
-# 1. NITROGEN-YIELD RELATIONSHIP
-################################################################################
+#===============================================================================
+# 1.0 NITROGEN-YIELD RELATIONSHIP ==============================================
+#===============================================================================
 
-### 1.1 Get data from crop simulation model
+#-------------------------------------------------------------------------------
+## 1.1 Get data from crop simulation model -------------------------------------
+#-------------------------------------------------------------------------------
+
 sim_yield <- read_csv("1_Data/RawData/EPIC2/Riccardo_EPIC.csv") 
 
 sim_yield <- sim_yield |> 
@@ -36,7 +51,6 @@ ggplot(sim_yield, aes(x = YLD)) +
   geom_histogram(binwidth = 0.1) +
   labs(x = "Yield (t/ha)", y = "Frequency") +
   theme_minimal() 
-
 
 # create control variables 
 sim_yield <- sim_yield |>
@@ -81,7 +95,9 @@ sim_yield_summary <- sim_yield |>
 
 #write_csv(sim_yield_summary, "3_Outputs/Table_YieldDescriptiveStatistics.csv")
 
-### Just & Pope production function estimation #######################################
+#-------------------------------------------------------------------------------
+## 1.2 Just & Pope production function estimation ------------------------------
+#-------------------------------------------------------------------------------
 
 # summary statistics
 summary <- sim_yield |>
@@ -100,6 +116,7 @@ summary <- sim_yield |>
 summary
 #write_csv(summary, "3_Outputs/Table_YieldSummary.csv")
 
+# production function estimation
 yield_function <- lmrob(
   YLD ~ sqrt(FTN) +
     FTN +
@@ -119,6 +136,7 @@ summary(yield_function)
 sim_yield <- sim_yield |>
   mutate(residuals = yield_function$residuals, abs_residuals = abs(residuals))
 
+# variation function estimation
 variation_function <- lmrob(
   abs_residuals ~ sqrt(FTN) +
     FTN +
@@ -134,7 +152,7 @@ variation_function <- lmrob(
 
 summary(variation_function)
 
-# table of results
+# export table of results
 models <- list(
   "Yield function" = yield_function,
   "Variation function" = variation_function
@@ -146,15 +164,19 @@ modelsummary(
   stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01)
 )
 
-################################################################################
-# 2. NITROGEN PRICES - WHEAT PRICES RELATIONSHIP
-################################################################################
+#===============================================================================
+# 2.0 Price Dynamics ===========================================================
+#===============================================================================
 
-### Import data ###############################################
+#-------------------------------------------------------------------------------
+## 2.1 Import data -------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
+# keep data only for Calcium Ammonium Nitrate (CAN)
 f_data <- read_csv("1_Data/FertilizerPrices.csv")
-f_data <- f_data[f_data[[2]] == "CAN", ] # Keep only CAN data
+f_data <- f_data[f_data[[2]] == "CAN", ]
 
+# keep data only for Bread wheat
 w_data <- read_csv("1_Data/Wheatprices.csv")
 w_data <- w_data[w_data[[2]] == "Bread_Wheat", ] # alt. 'Feed_Wheat'
 
@@ -173,7 +195,6 @@ dat <- inner_join(w_data, f_data, by = "Date") |>
   rename(w_p = Avg_Price.x, f_p = Avg_Price.y) |>
   dplyr::select(Date, w_p, f_p) |>
   filter(Date >= as.Date("2009-01-01")) |>       # Remove pre-2009 obs. (monthly up until that point)
-  #mutate(w_p = w_p / 100, f_p = f_p / 100) |>    # Transform prices to €/kg
   mutate(w_p = log(w_p), f_p = log(f_p))         # Log prices
 
 range(dat$Date)
@@ -185,7 +206,7 @@ sum(diff(dat$Date) != 14)
 sum(diff(dat$Date) == 14)
 
 # we dont have regular 14-day intervals, data is recorder every 1st and 3rd
-# monday of the month (sometimes 3 week gaps are introduced)
+# monday of the month (3 week gaps are introduced)
 
 # plot prices
 price_plot <- ggplot(dat, aes(x = Date)) +
@@ -212,8 +233,11 @@ price_plot
 
 #ggsave("3_Outputs/Fig_Prices.pdf", plot = price_plot, width = 6, height = 4)
 
+#-------------------------------------------------------------------------------
+## 2.2 Test for stationarity ---------------------------------------------------
+#-------------------------------------------------------------------------------
 
-# check for stationarity
+# check for stationarity for CAN prices
 adf.test(dat$f_p, k=24)
 adf.test(dat$f_p, k=12)
 adf.test(dat$f_p, k=6)
@@ -236,7 +260,7 @@ pp.test(dat$f_p)
 pp_f <- pp.test(dat$f_p)
 # fail to reject the null (stationary)=> non-stationarity
 
-
+# check for stationarity for wheat prices
 adf.test(dat$w_p, k=24)
 adf.test(dat$w_p, k=12)
 adf.test(dat$w_p, k=6)
@@ -254,8 +278,10 @@ pp.test(dat$w_p)
 pp_w <- pp.test(dat$w_p)
 # fail to reject the null of non-stationary => non-stationarity
 
+#-------------------------------------------------------------------------------
+### 2.2.1 Take first difference if not stationary ------------------------------
+#-------------------------------------------------------------------------------
 
-# time series are non-stationary: take first differences
 dif_dat <- dat |>
   mutate(
     w_p = c(NA, diff(w_p)),
@@ -281,8 +307,10 @@ pp.test(dif_dat$w_p)
 pp_f_dif <- pp.test(dif_dat$f_p)
 pp_w_dif <- pp.test(dif_dat$w_p)
 
+#-------------------------------------------------------------------------------
+## 2.3 Plot --------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
-# plot differenced prices
 plot_dif_w <- ggplot(dif_dat, aes(x = Date)) +
   geom_line(aes(y = w_p), linewidth = 0.5, color = "orange") +
   #geom_hline(yintercept = 0, linetype = "dashed") +
@@ -310,7 +338,10 @@ coint_test <- ca.jo(dat[, c("f_p", "w_p")], type = "trace", ecdet = "trend", K =
 summary(coint_test)
 # weak evidence of cointegration at 10% level
 
-# summary statistics of differenced prices
+#-------------------------------------------------------------------------------
+## 2.4 Summary statistics of differenced prices --------------------------------
+#-------------------------------------------------------------------------------
+
 summary_price_table <- tibble(
   Statistic = c("Mean", "SD", "Min", "Max", "Skew", "Kurtosis", "ADF test", 
                 "KPSS test", "PP test"),
@@ -363,7 +394,11 @@ summary_price_table
 
 #write_csv(summary_price_table, "3_Outputs/Table_PriceSummary.csv")
 
-### create deflated prices ################################################################
+#-------------------------------------------------------------------------------
+## 2.5 Create deflated prices for later comparison -----------------------------
+#-------------------------------------------------------------------------------
+
+# import PPI data
 ppi_output <- read_xlsx("1_Data/RawData/PPI_Cereals_Germany.xlsx", skip = 4)
 ppi_input <- read_xlsx("1_Data/RawData/PPI_Fertilizers_Germany.xlsx", skip = 4)
 
@@ -422,11 +457,12 @@ defl_w_p <- w_data |>
   left_join(ppi_w, by = "year") |> 
   mutate(real_w_p = w_p * (ppi_base / ppi))
 
-
-### Specify and Estimate VAR ####################################################
+#-------------------------------------------------------------------------------
+## 2.6 Test for best QVAR model ------------------------------------------------
+#-------------------------------------------------------------------------------
 
 # Create regression variables
-dif_dat <- dif_dat %>%
+dif_dat <- dif_dat |> 
   mutate(
     w_p1 = lag(w_p, 1), # wheat lags
     w_p2 = lag(w_p, 2),
@@ -441,23 +477,24 @@ dif_dat <- dif_dat %>%
   ) |>
   drop_na()
 
-
-vardat <- dif_dat %>% dplyr::select(w_p, f_p)
+vardat <- dif_dat |> dplyr::select(w_p, f_p)
 
 # lag selection
 VARselect(vardat, lag.max = 4, type = "const")
 # either 1 or 2 lags suggested by info criteria
 
-# estimate VAR
+# estimate VAR(1)
 var1 <- VAR(vardat, p = 1)
 summary(var1)
 serial.test(var1, lags.pt = 12, type = "PT.asymptotic")
 # Strong rejection of the null hypothesis - there is significant serial correlation
 
+# estimate VAR(2)
 var2 <- VAR(vardat, p = 2)
 summary(var2)
 serial.test(var2, lags.pt = 12, type = "PT.asymptotic")
 
+# estimate VAR(3)
 var3 <- VAR(vardat, p = 3)
 summary(var3)
 serial.test(var3, lags.pt = 12, type = "PT.asymptotic")
@@ -496,7 +533,6 @@ dif_dat <- dif_dat |>
     )
   )
 
-
 # select lag with exogenous variables
 VARselect(vardat, lag.max = 4, type = "const")
 VARselect(vardat, lag.max = 12, exogen = cbind(dif_dat[, c("w_ps1", "f_ps1")])) 
@@ -522,16 +558,17 @@ VARselect(
 ) 
 
 # best model according to AIC and BIC is p=1/2 with squared terms 
-# following JP we stay with the linear model as the squared specification 
-# does not produce a stable price simulation 
+# we stay with the linear model as the squared specification does not produce a stable price simulation 
 
-
-### Specify and Estimate QVAR ####################################################
+#-------------------------------------------------------------------------------
+## 2.7 QVAR estimation ---------------------------------------------------------
+#-------------------------------------------------------------------------------
 
 # define individual marginal specifications based on information criteria
 mf <- f_p ~ f_p1 + w_p1  
 mw <- w_p ~ f_p1 + w_p1 
 
+# var estimation
 var_f <- lm(mf, data = dif_dat) 
 summary(var_f)
 var_w <- lm(mw, data = dif_dat)
@@ -548,7 +585,6 @@ sum_qvar_f
 sum_qvar_w
 
 # Calculate pseudo R^2s for table (both wheat and fertilizer)
-
 psu_r2s_w <- numeric(length(taus_sparse))
 psu_r2s_f <- numeric(length(taus_sparse))
 rho <- function(u, tau) sum(u * (tau - (u < 0))) # rho calc from JP code
@@ -601,16 +637,16 @@ modelsummary(
   stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01)
 )
 
-### full QVAR estimation #################################################
-
+# full QVAR estimation
 taus_dense <- seq(0.01, 0.99, by = 0.01)
 fit_f <- rq(mf, tau = taus_dense, data = dif_dat)
 fit_w <- rq(mw, tau = taus_dense, data = dif_dat)
 
+# save the coefficients
 coeff_w <- fit_w$coeff
 coeff_f <- fit_f$coeff
 
-# Independent variables
+# Get independent variables
 w_p <- dif_dat$w_p
 w_p1 <- dif_dat$w_p1
 
@@ -626,9 +662,14 @@ y_w <- t(apply(y_w, 1, cummax))
 y_f <- X %*% coeff_f
 y_f <- t(apply(y_f, 1, cummax))
 
-### Copula estimation #################################################
+#-------------------------------------------------------------------------------
+## 2.8 Copula estimation -------------------------------------------------------
+#-------------------------------------------------------------------------------
+
+# get number of rows
 n = nrow(vardat)
 
+# initialize arrays
 F_w <- array(0, dim = c(n, 1))
 F_f <- array(0, dim = c(n, 1))
 
@@ -662,7 +703,10 @@ plot(
 )
 abline(h = 0, lty = 2)
 
-# ----- Stability analysis ----
+#-------------------------------------------------------------------------------
+## 2.9 Dynamic stability analysis ----------------------------------------------
+#-------------------------------------------------------------------------------
+
 ntau <- length(taus_sparse)
 ncof <- ncol(X)
 bootreps <- 1000
@@ -695,7 +739,7 @@ for (i in 1:ntau) {
   
 }
 
-# ---- Projection matrix ----
+# Projection matrix
 for (f in 1:ntau) {
   for (w in 1:ntau) {
     for (r in 1:bootreps) {
@@ -717,19 +761,28 @@ for (f in 1:ntau) {
 
 # Test stability at tau = 0.5,0.5
 t.test(MRev[, 3, 3], mu = 1)
-################################################################################
-# 3. ADJUSTED CONTRACT PRICING
-################################################################################
 
-### Price path simulation ###########################################################
+
+#===============================================================================
+# 3.0 Price paths simulation ===================================================
+#===============================================================================
+
 set.seed(1234)
 
 n_dif <- nrow(dif_dat)
 n_lev <- nrow(dat)
 
-Nt <- 24 # number of periods to simulate (24 observations twice per month = 1 year)
-Ns <- 1000 # number of draws
+# number of periods to simulate (24 observations twice per month = 1 year)
+Nt <- 24 
 
+# number of draws
+Ns <- 1000 
+
+#-------------------------------------------------------------------------------
+## 3.1 Simulation --------------------------------------------------------------
+#-------------------------------------------------------------------------------
+
+# initialize arrays
 Ys_changes <- array(0, dim = c(2, Nt, Ns))
 Ys_levels <- array(0, dim = c(2, Nt, Ns))
 
@@ -763,7 +816,10 @@ for (it in 2:Nt) {
   }
 }
 
-# plot simulated prices ###############################################################
+#-------------------------------------------------------------------------------
+### 3.1.1 Plot simulated prices ------------------------------------------------
+#-------------------------------------------------------------------------------
+
 simulated_prices <- data.frame(
   time = rep(1:Nt, Ns),
   price_f = as.vector(Ys_levels[1, , ]),
@@ -834,16 +890,17 @@ density_plot_f_deflated <- ggplot() +
         name = NULL, 
         values = c("Simulated prices" = "#E41A1C", "Deflated historical prices" = "#377EB8")) +
     labs(
-        x = paste0("\nN = ", nrow(simulated_prices)),
+        x = paste0("\n(eur/t), N = ", nrow(simulated_prices)),
         y = "Density\n",
         title = "CAN Price Distributions") +
     theme_minimal() + 
     theme(
-        legend.position = c(0.85, 0.85),
+        legend.position = "null",
         legend.background = element_rect(fill = "white", color = "black"),  
         panel.grid.major.x = element_blank(), 
         panel.grid.minor = element_blank()    
-    )
+    ) +
+  coord_cartesian(ylim = c(0,0.025))
 
 density_plot_w_deflated <- ggplot() +
     geom_density(data = simulated_prices, aes(x = price_w_level, fill = "Simulated prices"), alpha = 0.5) +
@@ -852,26 +909,26 @@ density_plot_w_deflated <- ggplot() +
         name = NULL, 
         values = c("Simulated prices" = "#E41A1C", "Deflated historical prices" = "#377EB8")) +
     labs(
-        x = paste0("\nN = ", nrow(simulated_prices)),
-        y = "Density\n",
+        x = paste0("\n(eur/t), N = ", nrow(simulated_prices)),
+        y = NULL,
         title = "Wheat Price Distributions") +
     theme_minimal() + 
     theme(
-        legend.position = c(0.85, 0.85),
+        legend.position = c(0.7, 0.85),
         legend.background = element_rect(fill = "white", color = "black"),  
         panel.grid.major.x = element_blank(), 
-        panel.grid.minor = element_blank()    
-    )
+        panel.grid.minor = element_blank(),
+        axis.text.y = element_blank()    
+    ) 
 
-density_plot_f_deflated
-density_plot_w_deflated
+deflated_density_plot <- density_plot_f_deflated | density_plot_w_deflated
 
-#ggsave("3_Outputs/Fig_PriceDensity_CAN.pdf", plot = density_plot_f, width = 10, height = 6)
-#ggsave("3_Outputs/Fig_PriceDensity_Wheat.pdf", plot = density_plot_w, width = 10, height = 6)
-
+#ggsave("3_Outputs/Fig_PriceDensity_deflated.pdf", plot = deflated_density_plot, width = 10, height = 6)
 
 
-### Insurance Contract Price ###########################################################
+#===============================================================================
+# 4.0 Insurance Contract Pricing ===============================================
+#===============================================================================
 
 # Contract parameters
 obs_per_year <- 24         
@@ -882,7 +939,11 @@ int <- 0.03                # Interest rate
 T_years <- 0.5             # time to maturity (6 months)
 discount_factor <- 1 / (1 + int)^T_years
 
-# pricing based on simulated nitrogen prices  
+#-------------------------------------------------------------------------------
+## 4.1 pricing based on simulated nitrogen prices ------------------------------
+#-------------------------------------------------------------------------------
+
+# get simulated prices  
 sim_f_p <- array(dim = c(Ns, simulated_years))
 
 for (t in 1:simulated_years) {
@@ -913,8 +974,10 @@ mutate(across(everything(), ~ round(., 3)))
 
 #write_csv(premium_results, "3_Outputs/Table_ContractPayoff.csv")
 
+#-------------------------------------------------------------------------------
+### 4.1.1 Plot distribution density --------------------------------------------
+#-------------------------------------------------------------------------------
 
-# density plot of prices #########################################
 strike_vec <- premium_results$strike_price
 cb_colors <- brewer.pal(3, "Dark2")[1:2]
 
@@ -927,7 +990,7 @@ plot_original <- ggplot(data.frame(sim_f_p), aes(x = sim_f_p)) +
     y = "Density"
   ) +
   theme_minimal() +
-  coord_cartesian(ylim = c(0, 35)) 
+  coord_cartesian(ylim = c(0, 80), xlim = c(0.28, 0.43)) 
 
 # one plot per strike price (capped distribution)
 plot_list <- lapply(seq_along(strike_vec), function(i) {
@@ -952,7 +1015,7 @@ plot_list <- lapply(seq_along(strike_vec), function(i) {
     ) +
     theme_minimal() +
     theme(legend.position = "top") +
-    coord_cartesian(ylim = c(0, 35))
+    coord_cartesian(ylim = c(0, 80), xlim = c(0.28, 0.43))
 })
 
 plot_list[[2]] <- plot_list[[2]] + theme(legend.position = "none")
@@ -968,17 +1031,21 @@ final_plot
 
 #ggsave("3_Outputs/Fig_PriceDensities_SimulatedStrikes.pdf", plot = final_plot, width = 12, height = 8)
 
-################################################################################
-# 4. MONTE CARLO SIMULATION OF UTILITY OF PROFITS 
-################################################################################
+#===============================================================================
+# SIMULATION OF UTILITY OF PROFITS 
+#===============================================================================
 
-# Broad framing ################################################################
+#===============================================================================
+# 5.0 Broad framing ============================================================
+#===============================================================================
 
 # Parameters
 N <- 200             # amount of N applied
 CAN <- N/0.27        # amount of CAN (27% N)
 
-## Calculate profits ##########################################################
+#-------------------------------------------------------------------------------
+### 5.0.1 Simulate stochastic yields -------------------------------------------
+#-------------------------------------------------------------------------------
 
 # get coeff from production function regression
 coeff_0_yield <- yield_function$coefficients[1]
@@ -1009,7 +1076,6 @@ for (t in 1:simulated_years) {
   simulated_yield[ ,t] <- predicted_yield + stochastic_error [ ,t]
 }
 
-
 # get simulated wheat prices (t = 13 -> early July)
 output_selling_time <- 13 + (0:(simulated_years - 1)) * obs_per_year                                   
 
@@ -1023,18 +1089,20 @@ for (t in 1:simulated_years) {
 
 str(Ys_levels)
 
-### forward price calculations #####################################################################
+#-------------------------------------------------------------------------------
+### 5.0.2 Get price simulations and calculate profits --------------------------
+#-------------------------------------------------------------------------------
 
-# discounted prices 
+# get forward price 
 sim_f_p_forward <- rep(tail(f_data$Avg_Price/1000, 1) * discount_factor, Ns)
 
-# No contract profits
+# Calculate "no contract" profits
 profit_nc <- (sim_w_p * simulated_yield) - (sim_f_p * CAN)
 
-# Forward profits
+# Calculate "forward" profits
 profit_fc <- (sim_w_p * simulated_yield) - (sim_f_p_forward * CAN)
 
-# Adjusted contract profits
+# Calculate "adjusted contract" profits:
 # Initialize result data frame 
 df_simulated_profit <- data.frame(
   nc = profit_nc,
@@ -1056,9 +1124,14 @@ for (i in 1:nrow(premium_results)) {
   df_simulated_profit[[col_name]] <- profit_ac
 }
 
-### Summary tables ############################################################################
+#-------------------------------------------------------------------------------
+## 5.1 Summary tables ----------------------------------------------------------
+#-------------------------------------------------------------------------------
 
-#### CAN price paid under different contracts ####################################################
+#-------------------------------------------------------------------------------
+### 5.1.1 CAN price paid under different contracts -----------------------------
+#-------------------------------------------------------------------------------
+
 base_row_sim_prices <- tibble(
   strike     = NA,
   mean   = mean(sim_f_p),
@@ -1105,8 +1178,10 @@ price_stats_table
 
 #write_csv(price_stats_table, "3_Outputs/Table_ResultsPriceStats.csv")
 
+#-------------------------------------------------------------------------------
+### 5.1.2 Total costs under different contracts --------------------------------
+#-------------------------------------------------------------------------------
 
-#### total costs under different contracts ############################################## 
 base_row_costs <- tibble(
   strike     = NA,
   mean   = mean(sim_f_p * CAN),
@@ -1153,7 +1228,10 @@ costs_stats_table
 
 #write_csv(costs_stats_table, "3_Outputs/Table_ResultsCostsStats.csv")
 
-#### total profits under different contracts #######################################################################
+#-------------------------------------------------------------------------------
+### 5.1.3 Total profits under different contracts ------------------------------
+#-------------------------------------------------------------------------------
+
 summary_profits <- df_simulated_profit |> 
   pivot_longer(everything(), names_to = "variable", values_to = "value") |> 
   group_by(variable) |> 
@@ -1170,16 +1248,16 @@ summary_profits
 
 #write_csv(summary_profits, "3_Outputs/Table_ResultsProfitStats.csv")
 
+#-------------------------------------------------------------------------------
+## 5.2 Expected Utility Theory (EUT) values under broad framing ----------------
+#-------------------------------------------------------------------------------
 
-
-## Expected Utility Theory (EUT) under broad framing ########################################################## 
-
-# relative risk aversion values
-delta <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001)        
+# define absolute risk aversion values
+delta <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005)        
 
 target_cols <- colnames(df_simulated_profit)
 
-### CE and RP with Mean-Variance approach ##########################################
+# CE and RP with Mean-Variance approach
 eut_results_broadframing <- data.frame(
   Variable = character(),
   Delta = numeric(),
@@ -1233,10 +1311,9 @@ eut_results_broadframing
 
 #write_csv(eut_results_broadframing, "3_Outputs/Table_Results_EUT_Broadframing.csv")
 
-
-
-
-## Cumulative Prospect Theory (CPT) ######################################################
+#-------------------------------------------------------------------------------
+## 5.3 Cumulative Prospect Theory (CPT) under broad framing --------------------
+#-------------------------------------------------------------------------------
 
 # risk aversion
 a_values <- c(0.1, 0.334, 0.5)   
@@ -1329,13 +1406,14 @@ for (a in a_values) {
         )
         
         cpt_results_broadframing <- rbind(cpt_results_broadframing, new_row)
-      } # End col_name loop
-    } # End gamma loop
-  } # End lambda loop
-} # End alpha loop
+      } 
+    } 
+  } 
+} 
 
-
-### display CPT results ##################################################################
+#-------------------------------------------------------------------------------
+### 5.3.1 display CPT results --------------------------------------------------
+#-------------------------------------------------------------------------------
 
 # standard assumptions
 alpha_std  <- 0.334
@@ -1394,12 +1472,14 @@ final_cpt_table
 
 #write_csv(final_cpt_table, "3_Outputs/Table_Results_CPT_BroadFraming.csv")
 
+#===============================================================================
+# 6.0 Narrow Framing ===========================================================
+#===============================================================================
 
-
-# Narrow Framing ####################################################################
-
-## calculate profits ####################################################################
-
+#-------------------------------------------------------------------------------
+## 6.0.1 calculate profits ------------------------------------------------------
+#-------------------------------------------------------------------------------
+  
 # forward contract 
 profit_fc_nf <- CAN * (sim_f_p_forward - sim_f_p)
 
@@ -1439,7 +1519,11 @@ summary_profits_narrowframing
 
 #write_csv(summary_profits_narrowframing, "3_Outputs/Table_Results_Profits_NarrowFraming.csv")
 
-## Expected Utility Theory (EUT) narrow framing #####################################################################
+#-------------------------------------------------------------------------------
+## 6.1 Expected Utility Theory (EUT) under narrow framing ----------------------
+#-------------------------------------------------------------------------------
+
+delta <- c(0, 0.0005, 0.0007, 0.001, 0.003)
 
 target_cols <- colnames(df_profit_narrowframing)
 
@@ -1496,9 +1580,9 @@ final_eut_table_narrowframing
 
 #write_csv(final_eut_table_narrowframing, "3_Outputs/Table_Results_EUT_NarrowFraming.csv")
 
-
-
-## Cumulative Prospect Theory (CPT) under narrow framing #####################################################
+#-------------------------------------------------------------------------------
+## 6.2 Cumulative Prospect Theory (CPT) under narrow framing -------------------
+#-------------------------------------------------------------------------------
 
 ref_point <- 0
    
@@ -1576,7 +1660,9 @@ for (a in a_values) {
   } # End lambda loop
 } # End alpha loop
 
-### display CPT results ##################################################################
+#-------------------------------------------------------------------------------
+### 6.2.1 display CPT results --------------------------------------------------
+#-------------------------------------------------------------------------------
 
 # standard assumptions
 alpha_std  <- 0.334
