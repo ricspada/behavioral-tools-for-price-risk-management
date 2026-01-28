@@ -6,18 +6,18 @@ This repository contains the data and R code for the research on "Behavioral Inp
 
 The repository is organized as follows:
 
-- **1_Data/** 
-  - `RawData/`: Includes raw outputs from the EPIC crop simulation model and PPI data.
-  - `FertilizerPrices.csv`: Historical fertilizer price data.
-  - `WheatPrices.csv`: Historical wheat price data.
-  - `Adjusted_Prices.csv`: Prices adjusted for inflation/PPI.
+- **1_Data/**
+  - **RawData/**
+    - PPI_Cereals_Germany.xlsx      Producer Price Index for cereals in Germany.
+    - PPI_Fertilizers_Germany.xlsx  Producer Price Index for fertilizers in Germany.
+  - `EPIC.csv`                      EPIC crop simulation model outputs.
+  - `FertilizerPrices.csv`          Historical fertilizer price data.
+  - `WheatPrices.csv`               Historical wheat price data.
   
-- **2_Scripts/** 
-  - `MainScript.R`: The core analytical script.
-  - `CropSimulation_Cleaning.R`: Cleans and prepares the EPIC crop simulation data.
-  - `PriceData_Cleaning.R`: Cleans and prepares the market price data.
+- **2_Scripts/**  
+  - `MainScript.R`                  The core analytical script.
   
-- **3_Outputs/**: Generated outputs from the scripts.
+- **3_Outputs/**                    Generated outputs from the scripts.
 
 ## Prerequisities
 
@@ -36,6 +36,7 @@ install.packages(c(
   "urca",
   "moments",
   "RColorBrewer"
+```
 
 ## Usage
 

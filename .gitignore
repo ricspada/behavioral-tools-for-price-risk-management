@@ -4,10 +4,12 @@
 .RData
 .Ruserdata
 
-# Others 
+# Others
+1_Data/RawData/EPIC_LAMASUS_CropSimulationData/
+1_Data/RawData/EPIC2/
+1_Data/RawData/PriceData/
 2_Scripts/example_code/
 2_Scripts/scrap.R
 2_Scripts/ContractPayoff.R
+2_Scripts/PriceData_Cleaning.R
 4_Documents/
-
-
