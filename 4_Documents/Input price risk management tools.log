@@ -1,0 +1,1491 @@
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (MiKTeX 21.6) (preloaded format=pdflatex 2026.2.26)  26 FEB 2026 15:36
+entering extended mode
+**"c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex"
+(c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex
+LaTeX2e <2021-06-01>
+L3 programming layer <2021-06-01> (C:\Program Files\MiKTeX\tex/latex/base\article.cls
+Document Class: article 2021/02/12 v1.4n Standard LaTeX document class
+(C:\Program Files\MiKTeX\tex/latex/base\size10.clo
+File: size10.clo 2021/02/12 v1.4n Standard LaTeX file (size option)
+)
+\c@part=\count182
+\c@section=\count183
+\c@subsection=\count184
+\c@subsubsection=\count185
+\c@paragraph=\count186
+\c@subparagraph=\count187
+\c@figure=\count188
+\c@table=\count189
+\abovecaptionskip=\skip47
+\belowcaptionskip=\skip48
+\bibindent=\dimen138
+) (C:\Program Files\MiKTeX\tex/latex/xcolor\xcolor.sty
+Package: xcolor 2016/05/11 v2.12 LaTeX color extensions (UK)
+ (C:\Program Files\MiKTeX\tex/latex/graphics-cfg\color.cfg
+File: color.cfg 2016/01/02 v1.6 sample color configuration
+)
+Package xcolor Info: Driver file: pdftex.def on input line 225.
+ (C:\Program Files\MiKTeX\tex/latex/graphics-def\pdftex.def
+File: pdftex.def 2020/10/05 v1.2a Graphics/color driver for pdftex
+)
+Package xcolor Info: Model `cmy' substituted by `cmy0' on input line 1348.
+Package xcolor Info: Model `hsb' substituted by `rgb' on input line 1352.
+Package xcolor Info: Model `RGB' extended on input line 1364.
+Package xcolor Info: Model `HTML' substituted by `rgb' on input line 1366.
+Package xcolor Info: Model `Hsb' substituted by `hsb' on input line 1367.
+Package xcolor Info: Model `tHsb' substituted by `hsb' on input line 1368.
+Package xcolor Info: Model `HSB' substituted by `hsb' on input line 1369.
+Package xcolor Info: Model `Gray' substituted by `gray' on input line 1370.
+Package xcolor Info: Model `wave' substituted by `hsb' on input line 1371.
+) (C:\Program Files\MiKTeX\tex/latex/amsmath\amsmath.sty
+Package: amsmath 2021/04/20 v2.17j AMS math features
+\@mathmargin=\skip49
+
+For additional information on amsmath, use the `?' option.
+(C:\Program Files\MiKTeX\tex/latex/amsmath\amstext.sty
+Package: amstext 2000/06/29 v2.01 AMS text
+ (C:\Program Files\MiKTeX\tex/latex/amsmath\amsgen.sty
+File: amsgen.sty 1999/11/30 v2.0 generic functions
+\@emptytoks=\toks16
+\ex@=\dimen139
+)) (C:\Program Files\MiKTeX\tex/latex/amsmath\amsbsy.sty
+Package: amsbsy 1999/11/29 v1.2d Bold Symbols
+\pmbraise@=\dimen140
+) (C:\Program Files\MiKTeX\tex/latex/amsmath\amsopn.sty
+Package: amsopn 2016/03/08 v2.02 operator names
+)
+\inf@bad=\count190
+LaTeX Info: Redefining \frac on input line 234.
+\uproot@=\count191
+\leftroot@=\count192
+LaTeX Info: Redefining \overline on input line 399.
+\classnum@=\count193
+\DOTSCASE@=\count194
+LaTeX Info: Redefining \ldots on input line 496.
+LaTeX Info: Redefining \dots on input line 499.
+LaTeX Info: Redefining \cdots on input line 620.
+\Mathstrutbox@=\box50
+\strutbox@=\box51
+\big@size=\dimen141
+LaTeX Font Info:    Redeclaring font encoding OML on input line 743.
+LaTeX Font Info:    Redeclaring font encoding OMS on input line 744.
+\macc@depth=\count195
+\c@MaxMatrixCols=\count196
+\dotsspace@=\muskip16
+\c@parentequation=\count197
+\dspbrk@lvl=\count198
+\tag@help=\toks17
+\row@=\count199
+\column@=\count266
+\maxfields@=\count267
+\andhelp@=\toks18
+\eqnshift@=\dimen142
+\alignsep@=\dimen143
+\tagshift@=\dimen144
+\tagwidth@=\dimen145
+\totwidth@=\dimen146
+\lineht@=\dimen147
+\@envbody=\toks19
+\multlinegap=\skip50
+\multlinetaggap=\skip51
+\mathdisplay@stack=\toks20
+LaTeX Info: Redefining \[ on input line 2923.
+LaTeX Info: Redefining \] on input line 2924.
+) (C:\Program Files\MiKTeX\tex/latex/amsfonts\amssymb.sty
+Package: amssymb 2013/01/14 v3.01 AMS font symbols
+ (C:\Program Files\MiKTeX\tex/latex/amsfonts\amsfonts.sty
+Package: amsfonts 2013/01/14 v3.01 Basic AMSFonts support
+\symAMSa=\mathgroup4
+\symAMSb=\mathgroup5
+LaTeX Font Info:    Redeclaring math symbol \hbar on input line 98.
+LaTeX Font Info:    Overwriting math alphabet `\mathfrak' in version `bold'
+(Font)                  U/euf/m/n --> U/euf/b/n on input line 106.
+)) (C:\Program Files\MiKTeX\tex/generic/iftex\iftex.sty
+Package: iftex 2020/03/06 v1.0d TeX engine tests
+) (C:\Program Files\MiKTeX\tex/latex/base\fontenc.sty
+Package: fontenc 2021/04/29 v2.0v Standard LaTeX package
+) (C:\Program Files\MiKTeX\tex/latex/base\inputenc.sty
+Package: inputenc 2021/02/14 v1.3d Input encoding file
+\inpenc@prehook=\toks21
+\inpenc@posthook=\toks22
+) (C:\Program Files\MiKTeX\tex/latex/base\textcomp.sty
+Package: textcomp 2020/02/02 v2.0n Standard LaTeX package
+) (C:\Program Files\MiKTeX\tex/latex/lm\lmodern.sty
+Package: lmodern 2009/10/30 v1.6 Latin Modern Fonts
+LaTeX Font Info:    Overwriting symbol font `operators' in version `normal'
+(Font)                  OT1/cmr/m/n --> OT1/lmr/m/n on input line 22.
+LaTeX Font Info:    Overwriting symbol font `letters' in version `normal'
+(Font)                  OML/cmm/m/it --> OML/lmm/m/it on input line 23.
+LaTeX Font Info:    Overwriting symbol font `symbols' in version `normal'
+(Font)                  OMS/cmsy/m/n --> OMS/lmsy/m/n on input line 24.
+LaTeX Font Info:    Overwriting symbol font `largesymbols' in version `normal'
+(Font)                  OMX/cmex/m/n --> OMX/lmex/m/n on input line 25.
+LaTeX Font Info:    Overwriting symbol font `operators' in version `bold'
+(Font)                  OT1/cmr/bx/n --> OT1/lmr/bx/n on input line 26.
+LaTeX Font Info:    Overwriting symbol font `letters' in version `bold'
+(Font)                  OML/cmm/b/it --> OML/lmm/b/it on input line 27.
+LaTeX Font Info:    Overwriting symbol font `symbols' in version `bold'
+(Font)                  OMS/cmsy/b/n --> OMS/lmsy/b/n on input line 28.
+LaTeX Font Info:    Overwriting symbol font `largesymbols' in version `bold'
+(Font)                  OMX/cmex/m/n --> OMX/lmex/m/n on input line 29.
+LaTeX Font Info:    Overwriting math alphabet `\mathbf' in version `normal'
+(Font)                  OT1/cmr/bx/n --> OT1/lmr/bx/n on input line 31.
+LaTeX Font Info:    Overwriting math alphabet `\mathsf' in version `normal'
+(Font)                  OT1/cmss/m/n --> OT1/lmss/m/n on input line 32.
+LaTeX Font Info:    Overwriting math alphabet `\mathit' in version `normal'
+(Font)                  OT1/cmr/m/it --> OT1/lmr/m/it on input line 33.
+LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `normal'
+(Font)                  OT1/cmtt/m/n --> OT1/lmtt/m/n on input line 34.
+LaTeX Font Info:    Overwriting math alphabet `\mathbf' in version `bold'
+(Font)                  OT1/cmr/bx/n --> OT1/lmr/bx/n on input line 35.
+LaTeX Font Info:    Overwriting math alphabet `\mathsf' in version `bold'
+(Font)                  OT1/cmss/bx/n --> OT1/lmss/bx/n on input line 36.
+LaTeX Font Info:    Overwriting math alphabet `\mathit' in version `bold'
+(Font)                  OT1/cmr/bx/it --> OT1/lmr/bx/it on input line 37.
+LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `bold'
+(Font)                  OT1/cmtt/m/n --> OT1/lmtt/m/n on input line 38.
+) (C:\ProgramData\MiKTeX\tex/latex/upquote\upquote.sty
+Package: upquote 2012/04/19 v1.3 upright-quote and grave-accent glyphs in verbatim
+) (C:\ProgramData\MiKTeX\tex/latex/microtype\microtype.sty
+Package: microtype 2025/07/09 v3.2b Micro-typographical refinements (RS)
+ (C:\Program Files\MiKTeX\tex/latex/graphics\keyval.sty
+Package: keyval 2014/10/28 v1.15 key=value parser (DPC)
+\KV@toks@=\toks23
+) (C:\Program Files\MiKTeX\tex/latex/etoolbox\etoolbox.sty
+Package: etoolbox 2020/10/05 v2.5k e-TeX tools for LaTeX (JAW)
+\etb@tempcnta=\count268
+)
+\MT@toks=\toks24
+\MT@tempbox=\box52
+\MT@count=\count269
+LaTeX Info: Redefining \noprotrusionifhmode on input line 1087.
+LaTeX Info: Redefining \leftprotrusion on input line 1088.
+\MT@prot@toks=\toks25
+LaTeX Info: Redefining \rightprotrusion on input line 1107.
+LaTeX Info: Redefining \textls on input line 1449.
+\MT@outer@kern=\dimen148
+LaTeX Info: Redefining \microtypecontext on input line 2053.
+LaTeX Info: Redefining \textmicrotypecontext on input line 2070.
+\MT@listname@count=\count270
+ (C:\ProgramData\MiKTeX\tex/latex/microtype\microtype-pdftex.def
+File: microtype-pdftex.def 2025/07/09 v3.2b Definitions specific to pdftex (RS)
+LaTeX Info: Redefining \lsstyle on input line 944.
+LaTeX Info: Redefining \lslig on input line 944.
+\MT@outer@space=\skip52
+)
+Package microtype Info: Loading configuration file microtype.cfg.
+ (C:\ProgramData\MiKTeX\tex/latex/microtype\microtype.cfg
+File: microtype.cfg 2025/07/09 v3.2b microtype main configuration file (RS)
+)
+LaTeX Info: Redefining \microtypesetup on input line 3065.
+) (C:\ProgramData\MiKTeX\tex/latex/parskip\parskip.sty
+Package: parskip 2021-03-14 v2.0h non-zero parskip adjustments
+ (C:\ProgramData\MiKTeX\tex/latex/kvoptions\kvoptions.sty
+Package: kvoptions 2022-06-15 v3.15 Key value format for package options (HO)
+ (C:\ProgramData\MiKTeX\tex/generic/ltxcmds\ltxcmds.sty
+Package: ltxcmds 2023-12-04 v1.26 LaTeX kernel commands for general use (HO)
+) (C:\ProgramData\MiKTeX\tex/latex/kvsetkeys\kvsetkeys.sty
+Package: kvsetkeys 2022-10-05 v1.19 Key value parser (HO)
+))) (C:\Program Files\MiKTeX\tex/latex/tools\longtable.sty
+Package: longtable 2021-05-07 v4.16 Multi-page Table package (DPC)
+\LTleft=\skip53
+\LTright=\skip54
+\LTpre=\skip55
+\LTpost=\skip56
+\LTchunksize=\count271
+\LTcapwidth=\dimen149
+\LT@head=\box53
+\LT@firsthead=\box54
+\LT@foot=\box55
+\LT@lastfoot=\box56
+\LT@gbox=\box57
+\LT@cols=\count272
+\LT@rows=\count273
+\c@LT@tables=\count274
+\c@LT@chunks=\count275
+\LT@p@ftn=\toks26
+) (C:\ProgramData\MiKTeX\tex/latex/booktabs\booktabs.sty
+Package: booktabs 2020/01/12 v1.61803398 Publication quality tables
+\heavyrulewidth=\dimen150
+\lightrulewidth=\dimen151
+\cmidrulewidth=\dimen152
+\belowrulesep=\dimen153
+\belowbottomsep=\dimen154
+\aboverulesep=\dimen155
+\abovetopsep=\dimen156
+\cmidrulesep=\dimen157
+\cmidrulekern=\dimen158
+\defaultaddspace=\dimen159
+\@cmidla=\count276
+\@cmidlb=\count277
+\@aboverulesep=\dimen160
+\@belowrulesep=\dimen161
+\@thisruleclass=\count278
+\@lastruleclass=\count279
+\@thisrulewidth=\dimen162
+) (C:\Program Files\MiKTeX\tex/latex/tools\array.sty
+Package: array 2021/04/20 v2.5e Tabular extension package (FMi)
+\col@sep=\dimen163
+\ar@mcellbox=\box58
+\extrarowheight=\dimen164
+\NC@list=\toks27
+\extratabsurround=\skip57
+\backup@length=\skip58
+\ar@cellbox=\box59
+)
+\c@none=\count280
+ (C:\ProgramData\MiKTeX\tex/latex/multirow\multirow.sty
+Package: multirow 2024/11/12 v2.9 Span multiple rows of a table
+\multirow@colwidth=\skip59
+\multirow@cntb=\count281
+\multirow@dima=\skip60
+\bigstrutjot=\dimen165
+) (C:\Program Files\MiKTeX\tex/latex/tools\calc.sty
+Package: calc 2017/05/25 v4.3 Infix arithmetic (KKT,FJ)
+\calc@Acount=\count282
+\calc@Bcount=\count283
+\calc@Adimen=\dimen166
+\calc@Bdimen=\dimen167
+\calc@Askip=\skip61
+\calc@Bskip=\skip62
+LaTeX Info: Redefining \setlength on input line 80.
+LaTeX Info: Redefining \addtolength on input line 81.
+\calc@Ccount=\count284
+\calc@Cskip=\skip63
+) (C:\ProgramData\MiKTeX\tex/latex/footnotehyper\footnotehyper.sty
+Package: footnotehyper 2025/11/15 v1.1f hyperref aware footnote.sty (JFB)
+\FNH@notes=\box60
+\FNH@width=\dimen168
+\FNH@toks=\toks28
+) (C:\Program Files\MiKTeX\tex/latex/graphics\graphicx.sty
+Package: graphicx 2020/12/05 v1.2c Enhanced LaTeX Graphics (DPC,SPQR)
+ (C:\Program Files\MiKTeX\tex/latex/graphics\graphics.sty
+Package: graphics 2021/03/04 v1.4d Standard LaTeX Graphics (DPC,SPQR)
+ (C:\Program Files\MiKTeX\tex/latex/graphics\trig.sty
+Package: trig 2016/01/03 v1.10 sin cos tan (DPC)
+) (C:\Program Files\MiKTeX\tex/latex/graphics-cfg\graphics.cfg
+File: graphics.cfg 2016/06/04 v1.11 sample graphics configuration
+)
+Package graphics Info: Driver file: pdftex.def on input line 107.
+)
+\Gin@req@height=\dimen169
+\Gin@req@width=\dimen170
+)
+\pandoc@box=\box61
+ (C:\ProgramData\MiKTeX\tex/latex/svg\svg.sty
+Package: svg 2020/11/26 v2.02k (include SVG pictures)
+ (C:\ProgramData\MiKTeX\tex/latex/koma-script\scrbase.sty
+
+LaTeX Warning: You have requested release `2022/06/01' of LaTeX,
+               but only release `2021-06-01' is available.
+
+Package: scrbase 2026/02/02 v3.49.2 KOMA-Script package (KOMA-Script-independent basics and keyval usage)
+(C:\ProgramData\MiKTeX\tex/latex/koma-script\scrlfile.sty
+Package: scrlfile 2026/02/02 v3.49.2 KOMA-Script package (file load hooks)
+ (C:\ProgramData\MiKTeX\tex/latex/koma-script\scrlfile-hook-3.34.sty
+Package: scrlfile-hook-3.34 2026/02/02 v3.49.2 KOMA-Script package (using LaTeX hooks)
+ (C:\ProgramData\MiKTeX\tex/latex/koma-script\scrlogo.sty
+Package: scrlogo 2026/02/02 v3.49.2 KOMA-Script package (logo)
+)))
+Applying: [2021/05/01] Usage of raw or classic option list on input line 254.
+Already applied: [0000/00/00] Usage of raw or classic option list on input line 370.
+) (C:\Program Files\MiKTeX\tex/generic/pdftexcmds\pdftexcmds.sty
+Package: pdftexcmds 2020-06-27 v0.33 Utility functions of pdfTeX for LuaTeX (HO)
+ (C:\ProgramData\MiKTeX\tex/generic/infwarerr\infwarerr.sty
+Package: infwarerr 2019/12/03 v1.5 Providing info/warning/error messages (HO)
+)
+Package pdftexcmds Info: \pdf@primitive is available.
+Package pdftexcmds Info: \pdf@ifprimitive is available.
+Package pdftexcmds Info: \pdfdraftmode found.
+) (C:\Program Files\MiKTeX\tex/latex/trimspaces\trimspaces.sty
+Package: trimspaces 2009/09/17 v1.1 Trim spaces around a token list
+) (C:\Program Files\MiKTeX\tex/latex/tools\shellesc.sty
+Package: shellesc 2019/11/08 v1.0c unified shell escape interface for LaTeX
+Package shellesc Info: Restricted shell escape enabled on input line 77.
+)
+\c@svg@param@lastpage=\count285
+\svg@box=\box62
+\c@svg@param@currpage=\count286
+) (C:\ProgramData\MiKTeX\tex/latex/transparent\transparent.sty
+Package: transparent 2025-06-23 v1.6 Transparency with color stacks
+
+C:\ProgramData\MiKTeX\tex/latex/transparent\transparent.sty:42: Undefined control sequence.
+l.42 \IfPDFManagementActiveF
+                             {\RequirePackage{transparent-nometadata}}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+(C:\ProgramData\MiKTeX\tex/latex/transparent\transparent-nometadata.sty
+Package: transparent-nometadata 2025-06-23 v1.6 Transparency via pdfTeX's color stack (HO)
+ (C:\ProgramData\MiKTeX\tex/latex/auxhook\auxhook.sty
+Package: auxhook 2019-12-17 v1.6 Hooks for auxiliary files (HO)
+))
+C:\ProgramData\MiKTeX\tex/latex/transparent\transparent.sty:43: Undefined control sequence.
+l.43 \IfPDFManagementActiveF
+                             {\endinput}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+) (C:\Program Files\MiKTeX\tex/latex/pgf/systemlayer\pgfsys.sty (C:\Program Files\MiKTeX\tex/latex/pgf/utilities\pgfrcs.sty (C:\Program Files\MiKTeX\tex/generic/pgf/utilities\pgfutil-common.tex
+\pgfutil@everybye=\toks29
+\pgfutil@tempdima=\dimen171
+\pgfutil@tempdimb=\dimen172
+ (C:\Program Files\MiKTeX\tex/generic/pgf/utilities\pgfutil-common-lists.tex)) (C:\Program Files\MiKTeX\tex/generic/pgf/utilities\pgfutil-latex.def
+\pgfutil@abb=\box63
+) (C:\Program Files\MiKTeX\tex/generic/pgf/utilities\pgfrcs.code.tex (C:\Program Files\MiKTeX\tex/generic/pgf\pgf.revision.tex)
+Package: pgfrcs 2021/05/15 v3.1.9a (3.1.9a)
+)) (C:\Program Files\MiKTeX\tex/generic/pgf/systemlayer\pgfsys.code.tex
+Package: pgfsys 2021/05/15 v3.1.9a (3.1.9a)
+ (C:\Program Files\MiKTeX\tex/generic/pgf/utilities\pgfkeys.code.tex
+\pgfkeys@pathtoks=\toks30
+\pgfkeys@temptoks=\toks31
+ (C:\Program Files\MiKTeX\tex/generic/pgf/utilities\pgfkeysfiltered.code.tex
+\pgfkeys@tmptoks=\toks32
+))
+\pgf@x=\dimen173
+\pgf@y=\dimen174
+\pgf@xa=\dimen175
+\pgf@ya=\dimen176
+\pgf@xb=\dimen177
+\pgf@yb=\dimen178
+\pgf@xc=\dimen179
+\pgf@yc=\dimen180
+\pgf@xd=\dimen181
+\pgf@yd=\dimen182
+\w@pgf@writea=\write3
+\r@pgf@reada=\read2
+\c@pgf@counta=\count287
+\c@pgf@countb=\count288
+\c@pgf@countc=\count289
+\c@pgf@countd=\count290
+\t@pgf@toka=\toks33
+\t@pgf@tokb=\toks34
+\t@pgf@tokc=\toks35
+\pgf@sys@id@count=\count291
+ (C:\Program Files\MiKTeX\tex/generic/pgf/systemlayer\pgf.cfg
+File: pgf.cfg 2021/05/15 v3.1.9a (3.1.9a)
+)
+Driver file for pgf: pgfsys-pdftex.def
+ (C:\Program Files\MiKTeX\tex/generic/pgf/systemlayer\pgfsys-pdftex.def
+File: pgfsys-pdftex.def 2021/05/15 v3.1.9a (3.1.9a)
+ (C:\Program Files\MiKTeX\tex/generic/pgf/systemlayer\pgfsys-common-pdf.def
+File: pgfsys-common-pdf.def 2021/05/15 v3.1.9a (3.1.9a)
+))) (C:\Program Files\MiKTeX\tex/generic/pgf/systemlayer\pgfsyssoftpath.code.tex
+File: pgfsyssoftpath.code.tex 2021/05/15 v3.1.9a (3.1.9a)
+\pgfsyssoftpath@smallbuffer@items=\count292
+\pgfsyssoftpath@bigbuffer@items=\count293
+) (C:\Program Files\MiKTeX\tex/generic/pgf/systemlayer\pgfsysprotocol.code.tex
+File: pgfsysprotocol.code.tex 2021/05/15 v3.1.9a (3.1.9a)
+)) (C:\ProgramData\MiKTeX\tex/generic/soul\soul.sty
+Package: soul 2023-06-14 v3.1 Permit use of UTF-8 characters in soul (HO)
+ (C:\ProgramData\MiKTeX\tex/generic/soul\soul-ori.sty
+Package: soul-ori 2023-06-14 v3.1 letterspacing/underlining (mf)
+\SOUL@word=\toks36
+\SOUL@lasttoken=\toks37
+\SOUL@syllable=\toks38
+\SOUL@cmds=\toks39
+\SOUL@buffer=\toks40
+\SOUL@token=\toks41
+\SOUL@syllgoal=\dimen183
+\SOUL@syllwidth=\dimen184
+\SOUL@charkern=\dimen185
+\SOUL@hyphkern=\dimen186
+\SOUL@dimen=\dimen187
+\SOUL@dimeni=\dimen188
+\SOUL@minus=\count294
+\SOUL@comma=\count295
+\SOUL@apo=\count296
+\SOUL@grave=\count297
+\SOUL@spaceskip=\skip64
+\SOUL@ttwidth=\dimen189
+\SOUL@uldp=\dimen190
+\SOUL@ulht=\dimen191
+) (C:\ProgramData\MiKTeX\tex/generic/etexcmds\etexcmds.sty
+Package: etexcmds 2019/12/15 v1.7 Avoid name clashes with e-TeX commands (HO)
+)) (C:\ProgramData\MiKTeX\tex/latex/bookmark\bookmark.sty
+Package: bookmark 2023-12-10 v1.31 PDF bookmarks (HO)
+ (C:\Program Files\MiKTeX\tex/latex/hyperref\hyperref.sty
+Package: hyperref 2021-06-05 v7.00l Hypertext links for LaTeX
+ (C:\ProgramData\MiKTeX\tex/generic/kvdefinekeys\kvdefinekeys.sty
+Package: kvdefinekeys 2019-12-19 v1.6 Define keys (HO)
+) (C:\ProgramData\MiKTeX\tex/generic/pdfescape\pdfescape.sty
+Package: pdfescape 2019/12/09 v1.15 Implements pdfTeX's escape features (HO)
+) (C:\ProgramData\MiKTeX\tex/latex/hycolor\hycolor.sty
+Package: hycolor 2020-01-27 v1.10 Color options for hyperref/bookmark (HO)
+) (C:\ProgramData\MiKTeX\tex/latex/letltxmacro\letltxmacro.sty
+Package: letltxmacro 2019/12/03 v1.6 Let assignment for LaTeX macros (HO)
+)
+\@linkdim=\dimen192
+\Hy@linkcounter=\count298
+\Hy@pagecounter=\count299
+ (C:\Program Files\MiKTeX\tex/latex/hyperref\pd1enc.def
+File: pd1enc.def 2021-06-05 v7.00l Hyperref: PDFDocEncoding definition (HO)
+Now handling font encoding PD1 ...
+... no UTF-8 mapping file for font encoding PD1
+) (C:\Program Files\MiKTeX\tex/latex/hyperref\hyperref-langpatches.def
+File: hyperref-langpatches.def 2021-06-05 v7.00l Hyperref: patches for babel languages
+) (C:\ProgramData\MiKTeX\tex/generic/intcalc\intcalc.sty
+Package: intcalc 2019/12/15 v1.3 Expandable calculations with integers (HO)
+)
+\Hy@SavedSpaceFactor=\count300
+ (C:\Program Files\MiKTeX\tex/latex/hyperref\puenc.def
+File: puenc.def 2021-06-05 v7.00l Hyperref: PDF Unicode definition (HO)
+Now handling font encoding PU ...
+... no UTF-8 mapping file for font encoding PU
+)
+Package hyperref Info: Option `unicode' set `true' on input line 4073.
+Package hyperref Info: Hyper figures OFF on input line 4192.
+Package hyperref Info: Link nesting OFF on input line 4197.
+Package hyperref Info: Hyper index ON on input line 4200.
+Package hyperref Info: Plain pages OFF on input line 4207.
+Package hyperref Info: Backreferencing OFF on input line 4212.
+Package hyperref Info: Implicit mode ON; LaTeX internals redefined.
+Package hyperref Info: Bookmarks ON on input line 4445.
+\c@Hy@tempcnt=\count301
+ (C:\Program Files\MiKTeX\tex/latex/url\url.sty
+\Urlmuskip=\muskip17
+Package: url 2013/09/16  ver 3.4  Verb mode for urls, etc.
+)
+LaTeX Info: Redefining \url on input line 4804.
+\XeTeXLinkMargin=\dimen193
+
+C:\Program Files\MiKTeX\tex/latex/hyperref\hyperref.sty:5184: Undefined control sequence.
+l.5184 \AddLineBeginAux
+                       {%
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+
+C:\Program Files\MiKTeX\tex/latex/hyperref\hyperref.sty:5185: LaTeX Error: Missing \begin{document}.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.5185   \string\providecommand
+                               \string\hyper@newdestlabel[2]{}%
+You're in trouble here.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+(C:\ProgramData\MiKTeX\tex/generic/bitset\bitset.sty
+Package: bitset 2019/12/09 v1.3 Handle bit-vector datatype (HO)
+ (C:\ProgramData\MiKTeX\tex/generic/bigintcalc\bigintcalc.sty
+Package: bigintcalc 2019/12/15 v1.5 Expandable calculations on big integers (HO)
+))
+\Fld@menulength=\count302
+\Field@Width=\dimen194
+\Fld@charsize=\dimen195
+Package hyperref Info: Hyper figures OFF on input line 6076.
+Package hyperref Info: Link nesting OFF on input line 6081.
+Package hyperref Info: Hyper index ON on input line 6084.
+Package hyperref Info: backreferencing OFF on input line 6091.
+Package hyperref Info: Link coloring OFF on input line 6096.
+Package hyperref Info: Link coloring with OCG OFF on input line 6101.
+Package hyperref Info: PDF/A mode OFF on input line 6106.
+
+Overfull \hbox (760.39673pt too wide) in paragraph at lines 5185--6144
+[]\T1/cmr/m/n/10 \providecommand\hyper@newdestlabel[2]                                                                                                                                                                                                                                                                                                                                                                                                                                
+ []
+
+LaTeX Info: Redefining \ref on input line 6146.
+LaTeX Info: Redefining \pageref on input line 6150.
+(C:\Program Files\MiKTeX\tex/latex/base\atbegshi-ltx.sty
+Package: atbegshi-ltx 2021/01/10 v1.0c Emulation of the original atbegshi
+package with kernel methods
+)
+\Hy@abspage=\count303
+\c@Item=\count304
+\c@Hfootnote=\count305
+)
+Package hyperref Info: Driver (autodetected): hpdftex.
+ (C:\Program Files\MiKTeX\tex/latex/hyperref\hpdftex.def
+File: hpdftex.def 2021-06-05 v7.00l Hyperref driver for pdfTeX
+ (C:\Program Files\MiKTeX\tex/latex/base\atveryend-ltx.sty
+Package: atveryend-ltx 2020/08/19 v1.0a Emulation of the original atvery package
+with kernel methods
+)
+\Fld@listcount=\count306
+\c@bookmark@seq@number=\count307
+ (C:\ProgramData\MiKTeX\tex/latex/rerunfilecheck\rerunfilecheck.sty
+Package: rerunfilecheck 2025-06-21 v1.11 Rerun checks for auxiliary files (HO)
+ (C:\ProgramData\MiKTeX\tex/generic/uniquecounter\uniquecounter.sty
+Package: uniquecounter 2019/12/15 v1.4 Provide unlimited unique counter (HO)
+)
+Package uniquecounter Info: New unique counter `rerunfilecheck' on input line 284.
+)
+\Hy@SectionHShift=\skip65
+) (C:\ProgramData\MiKTeX\tex/latex/bookmark\bkm-pdftex.def
+File: bkm-pdftex.def 2023-12-10 v1.31 bookmark driver for pdfTeX and luaTeX (HO)
+
+C:\ProgramData\MiKTeX\tex/latex/bookmark\bkm-pdftex.def:152: Undefined control sequence.
+l.152 \IfDocumentMetadataTF
+                           
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:\ProgramData\MiKTeX\tex/latex/bookmark\bkm-pdftex.def:154: Undefined control sequence.
+l.154    \tag_if_active:T
+                         
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+\BKM@id=\count308
+)) (C:\ProgramData\MiKTeX\tex/latex/xurl\xurl.sty
+Package: xurl 2022/01/09 v 0.10 modify URL breaks
+)
+LaTeX Font Info:    Trying to load font information for T1+lmr on input line 86.
+ (C:\Program Files\MiKTeX\tex/latex/lm\t1lmr.fd
+File: t1lmr.fd 2009/10/30 v1.6 Font defs for Latin Modern
+) (C:\Program Files\MiKTeX\tex/latex/l3backend\l3backend-pdftex.def
+File: l3backend-pdftex.def 2021-05-07 L3 backend support: PDF output (pdfTeX)
+\l__color_backend_stack_int=\count309
+\l__pdf_internal_box=\box64
+)
+No file "Input price risk management tools".aux.
+\openout1 = `"Input price risk management tools.aux"'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 86.
+LaTeX Font Info:    ... okay on input line 86.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 86.
+LaTeX Font Info:    ... okay on input line 86.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 86.
+LaTeX Font Info:    ... okay on input line 86.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 86.
+LaTeX Font Info:    ... okay on input line 86.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 86.
+LaTeX Font Info:    ... okay on input line 86.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 86.
+LaTeX Font Info:    ... okay on input line 86.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 86.
+LaTeX Font Info:    ... okay on input line 86.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 86.
+LaTeX Font Info:    ... okay on input line 86.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 86.
+LaTeX Font Info:    ... okay on input line 86.
+(C:\Program Files\MiKTeX\tex/context/base/mkii\supp-pdf.mkii
+[Loading MPS to PDF converter (version 2006.09.02).]
+\scratchcounter=\count310
+\scratchdimen=\dimen196
+\scratchbox=\box65
+\nofMPsegments=\count311
+\nofMParguments=\count312
+\everyMPshowfont=\toks42
+\MPscratchCnt=\count313
+\MPscratchDim=\dimen197
+\MPnumerator=\count314
+\makeMPintoPDFobject=\count315
+\everyMPtoPDFconversion=\toks43
+) (C:\Program Files\MiKTeX\tex/latex/epstopdf-pkg\epstopdf-base.sty
+Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
+Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 485.
+ (C:\Program Files\MiKTeX\tex/latex/00miktex\epstopdf-sys.cfg
+File: epstopdf-sys.cfg 2021/03/18 v2.0 Configuration of epstopdf for MiKTeX
+))
+LaTeX Info: Redefining \microtypecontext on input line 86.
+Package microtype Info: Applying patch `item' on input line 86.
+Package microtype Info: Applying patch `toc' on input line 86.
+Package microtype Info: Applying patch `eqnum' on input line 86.
+Package microtype Info: Applying patch `footnote' on input line 86.
+Package microtype Info: Applying patch `verbatim' on input line 86.
+LaTeX Info: Redefining \microtypesetup on input line 86.
+Package microtype Info: Generating PDF output.
+Package microtype Info: Character protrusion enabled (level 2).
+Package microtype Info: Using protrusion set `basicmath'.
+Package microtype Info: Automatic font expansion enabled (level 2),
+(microtype)             stretch: 20, shrink: 20, step: 1, non-selected.
+Package microtype Info: Using default expansion set `alltext-nott'.
+Package microtype Info: Patching command `\showhyphens'.
+Package microtype Info: No adjustment of tracking.
+Package microtype Info: No adjustment of interword spacing.
+Package microtype Info: No adjustment of character kerning.
+ (C:\ProgramData\MiKTeX\tex/latex/microtype\mt-cmr.cfg
+File: mt-cmr.cfg 2013/05/19 v2.2 microtype config. file: Computer Modern Roman (RS)
+)
+Package hyperref Info: Link coloring OFF on input line 86.
+ (C:\Program Files\MiKTeX\tex/latex/hyperref\nameref.sty
+Package: nameref 2021-04-02 v2.47 Cross-referencing by name of section
+ (C:\ProgramData\MiKTeX\tex/latex/refcount\refcount.sty
+Package: refcount 2019/12/15 v3.6 Data extraction from label references (HO)
+) (C:\ProgramData\MiKTeX\tex/generic/gettitlestring\gettitlestring.sty
+Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
+)
+\c@section@level=\count316
+)
+LaTeX Info: Redefining \ref on input line 86.
+LaTeX Info: Redefining \pageref on input line 86.
+LaTeX Info: Redefining \nameref on input line 86.
+LaTeX Font Info:    Trying to load font information for OT1+lmr on input line 91.
+ (C:\Program Files\MiKTeX\tex/latex/lm\ot1lmr.fd
+File: ot1lmr.fd 2009/10/30 v1.6 Font defs for Latin Modern
+)
+LaTeX Font Info:    Trying to load font information for OML+lmm on input line 91.
+ (C:\Program Files\MiKTeX\tex/latex/lm\omllmm.fd
+File: omllmm.fd 2009/10/30 v1.6 Font defs for Latin Modern
+)
+LaTeX Font Info:    Trying to load font information for OMS+lmsy on input line 91.
+ (C:\Program Files\MiKTeX\tex/latex/lm\omslmsy.fd
+File: omslmsy.fd 2009/10/30 v1.6 Font defs for Latin Modern
+)
+LaTeX Font Info:    Trying to load font information for OMX+lmex on input line 91.
+ (C:\Program Files\MiKTeX\tex/latex/lm\omxlmex.fd
+File: omxlmex.fd 2009/10/30 v1.6 Font defs for Latin Modern
+)
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <10> on input line 91.
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <7> on input line 91.
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <5> on input line 91.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 91.
+ (C:\Program Files\MiKTeX\tex/latex/amsfonts\umsa.fd
+File: umsa.fd 2013/01/14 v3.01 AMS symbols A
+) (C:\ProgramData\MiKTeX\tex/latex/microtype\mt-msa.cfg
+File: mt-msa.cfg 2006/02/04 v1.1 microtype config. file: AMS symbols (a) (RS)
+)
+LaTeX Font Info:    Trying to load font information for U+msb on input line 91.
+ (C:\Program Files\MiKTeX\tex/latex/amsfonts\umsb.fd
+File: umsb.fd 2013/01/14 v3.01 AMS symbols B
+) (C:\ProgramData\MiKTeX\tex/latex/microtype\mt-msb.cfg
+File: mt-msb.cfg 2005/06/01 v1.0 microtype config. file: AMS symbols (b) (RS)
+)
+Underfull \hbox (badness 2384) in paragraph at lines 91--95
+[]\T1/lmr/m/n/10 (+20) Riccardo Spada$[]$, Lukas �kerman$[]$, Si-mone Cerroni$[]$, Mi-randa P.M.
+ []
+
+LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 123.
+(C:\Program Files\MiKTeX\tex/latex/lm\ts1lmr.fd
+File: ts1lmr.fd 2009/10/30 v1.6 Font defs for Latin Modern
+)
+Overfull \vbox (438.1108pt too high) has occurred while \output is active []
+
+ [1
+
+{C:/Users/spada001/AppData/Local/MiKTeX/pdftex/config/pdftex.map}]
+
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:243: Package inputenc Error: Unicode character α (U+03B1)
+(inputenc)                not set up for use with LaTeX.
+
+See the inputenc package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.243 not know them. In this context, the α
+                                            -Expected Utility (αEU) model
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:243: Package inputenc Error: Unicode character α (U+03B1)
+(inputenc)                not set up for use with LaTeX.
+
+See the inputenc package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.243 ...this context, the α-Expected Utility (α
+                                                  EU) model
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+[2] [3]
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <8> on input line 327.
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <6> on input line 327.
+
+
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:327: Package inputenc Error: Unicode character α (U+03B1)
+(inputenc)                not set up for use with LaTeX.
+
+See the inputenc package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.327   prediction.} Here we adopt the α
+                                         EU model proposed by Ghirardato et al.
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+[4]
+
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:392: Package svg Error: File `image2.svg' is missing.
+
+See the svg package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.392 ...6.5in,height=1.71875in]{media/image2.svg}
+                                                  
+There's no file `image2.svg'
+in folder `media/'.
+
+[5]
+
+LaTeX Warning: Hyper reference `_Ref205816026' on page 6 undefined on input line 466.
+
+
+Overfull \hbox (9.23744pt too wide) in paragraph at lines 500--504
+ []|$[] $| 
+ []
+
+[6] [7] [8]
+
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:626: Package inputenc Error: Unicode character 𝑔 (U+1D454)
+(inputenc)                not set up for use with LaTeX.
+
+See the inputenc package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.626 where the distribution functions 𝑔
+                                           (⋅) explain the contemporaneous...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:626: Package inputenc Error: Unicode character ⋅ (U+22C5)
+(inputenc)                not set up for use with LaTeX.
+
+See the inputenc package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.626 where the distribution functions 𝑔(⋅
+                                               ) explain the contemporaneous...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:629: Package inputenc Error: Unicode character 𝑔 (U+1D454)
+(inputenc)                not set up for use with LaTeX.
+
+See the inputenc package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.629   continuous distribution function.}
+                                           We are interested in the joint
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:629: Package inputenc Error: Unicode character ⋅ (U+22C5)
+(inputenc)                not set up for use with LaTeX.
+
+See the inputenc package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.629   continuous distribution function.}
+                                           We are interested in the joint
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+LaTeX Warning: Hyper reference `economic-model' on page 9 undefined on input line 670.
+
+
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:688: Package inputenc Error: Unicode character α (U+03B1)
+(inputenc)                not set up for use with LaTeX.
+
+See the inputenc package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.688 under EUT, CPT, and the α
+                                -EU frameworks. Under narrow framing, farmers
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+[9]
+
+LaTeX Warning: Hyper reference `_Ref212044160' on page 10 undefined on input line 736.
+
+[10]
+Underfull \hbox (badness 10000) in paragraph at lines 767--768
+
+ []
+
+
+Overfull \hbox (10.32867pt too wide) in paragraph at lines 786--787
+ []\T1/lmr/bx/n/10 (-20) Median 
+ []
+
+
+Overfull \hbox (2.62999pt too wide) in paragraph at lines 792--793
+ []\T1/lmr/bx/n/10 (-20) Min 
+ []
+
+
+Overfull \hbox (1.80507pt too wide) in paragraph at lines 794--795
+ []\T1/lmr/bx/n/10 (-20) Max 
+ []
+
+
+Overfull \hbox (22.29544pt too wide) in paragraph at lines 796--797
+ []\T1/lmr/bx/n/10 (-20) Observations 
+ []
+
+
+Overfull \hbox (1.94391pt too wide) in paragraph at lines 805--805
+ []|\T1/lmr/m/n/10 (-20) 14.01| 
+ []
+
+
+Overfull \hbox (1.94391pt too wide) in paragraph at lines 806--806
+ []|\T1/lmr/m/n/10 (-20) 13.32| 
+ []
+
+
+LaTeX Warning: Hyper reference `_Ref213337244' on page 11 undefined on input line 826.
+
+[11]
+
+LaTeX Warning: File `media/image3.png' not found on input line 835.
+
+
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:835: Package pdftex.def Error: File `media/image3.png' not found: using draft setting.
+
+See the pdftex.def package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.835 ...6.5in,height=5.17708in]{media/image3.png}
+                                                  
+Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 835.
+(C:\Program Files\MiKTeX\tex/latex/lm\t1lmtt.fd
+File: t1lmtt.fd 2009/10/30 v1.6 Font defs for Latin Modern
+)
+Overfull \hbox (124.88394pt too wide) in paragraph at lines 835--838
+ [][] 
+ []
+
+
+LaTeX Warning: Hyper reference `_Ref214287463' on page 12 undefined on input line 847.
+
+[12]
+
+LaTeX Warning: Hyper reference `_Ref214526676' on page 13 undefined on input line 938.
+
+
+LaTeX Warning: Hyper reference `_Ref214526730' on page 13 undefined on input line 939.
+
+
+Overfull \hbox (1.62271pt too wide) in paragraph at lines 980--980
+[]|\T1/lmr/m/n/10 (-20) Num.Obs.|  
+ []
+
+[13] [14]
+Overfull \hbox (2.76826pt too wide) in paragraph at lines 1029--1029
+[]|\T1/lmr/m/n/10 (-20) Num.Obs.|  
+ []
+
+[15]
+Underfull \hbox (badness 10000) in paragraph at lines 1069--1070
+
+ []
+
+
+LaTeX Warning: Hyper reference `_Ref214957457' on page 16 undefined on input line 1107.
+
+
+LaTeX Warning: Hyper reference `_Ref215049461' on page 16 undefined on input line 1119.
+
+
+LaTeX Warning: Hyper reference `_Ref215737709' on page 16 undefined on input line 1123.
+
+[16]
+Overfull \hbox (8.9242pt too wide) in paragraph at lines 1137--1138
+[]\T1/lmr/bx/n/10 (-20) Quantile  
+ []
+
+
+LaTeX Warning: File `media/image4.png' not found on input line 1155.
+
+
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:1155: Package pdftex.def Error: File `media/image4.png' not found: using draft setting.
+
+See the pdftex.def package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.1155 ....5in,height=4.97153in]{media/image4.png}
+                                                  
+Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+
+Overfull \hbox (124.88394pt too wide) in paragraph at lines 1155--1156
+[][] 
+ []
+
+[17]
+
+LaTeX Warning: Hyper reference `_Ref216184323' on page 18 undefined on input line 1170.
+
+
+LaTeX Warning: Hyper reference `_Ref216184771' on page 18 undefined on input line 1171.
+
+
+LaTeX Warning: Hyper reference `_Ref216184995' on page 18 undefined on input line 1172.
+
+
+LaTeX Warning: Hyper reference `_Ref216185008' on page 18 undefined on input line 1173.
+
+[18]
+Overfull \hbox (4.69572pt too wide) in paragraph at lines 1244--1245
+ []\T1/lmr/bx/n/10 (-20) Forward 
+ []
+
+
+Overfull \hbox (4.75136pt too wide) in paragraph at lines 1248--1249
+ []\T1/lmr/bx/n/10 (-20) Adjusted 
+ []
+
+
+Overfull \hbox (0.65506pt too wide) in paragraph at lines 1256--1256
+[]|\T1/lmr/bx/n/10 (-20) Strike|  
+ []
+
+
+Overfull \hbox (3.56732pt too wide) in paragraph at lines 1258--1258
+\T1/lmr/m/n/10 (-20) 0.00001|  
+ []
+
+
+Overfull \hbox (6.43874pt too wide) in paragraph at lines 1258--1258
+ []|\T1/lmr/m/n/10 (-20) 1162.43| 
+ []
+
+
+Overfull \hbox (3.69023pt too wide) in paragraph at lines 1259--1259
+ []|\T1/lmr/bx/n/10 (-20) 1162.57| 
+ []
+
+
+Overfull \hbox (0.80344pt too wide) in paragraph at lines 1259--1260
+ []|\T1/lmr/m/n/10 (-20) 1162.41| 
+ []
+
+
+Overfull \hbox (3.56732pt too wide) in paragraph at lines 1260--1260
+\T1/lmr/m/n/10 (-20) 0.00005|  
+ []
+
+
+Overfull \hbox (6.43874pt too wide) in paragraph at lines 1260--1260
+ []|\T1/lmr/m/n/10 (-20) 1160.47| 
+ []
+
+
+Overfull \hbox (0.80344pt too wide) in paragraph at lines 1261--1262
+ []|\T1/lmr/m/n/10 (-20) 1160.43| 
+ []
+
+
+Overfull \hbox (6.43874pt too wide) in paragraph at lines 1262--1262
+ []|\T1/lmr/m/n/10 (-20) 1158.02| 
+ []
+
+
+Overfull \hbox (0.80344pt too wide) in paragraph at lines 1263--1264
+ []|\T1/lmr/m/n/10 (-20) 1157.95| 
+ []
+
+
+Overfull \hbox (6.43874pt too wide) in paragraph at lines 1264--1264
+ []|\T1/lmr/m/n/10 (-20) 1138.43| 
+ []
+
+
+Overfull \hbox (0.80344pt too wide) in paragraph at lines 1265--1266
+ []|\T1/lmr/m/n/10 (-20) 1138.14| 
+ []
+
+
+Overfull \hbox (11.25706pt too wide) in paragraph at lines 1266--1266
+ []|\T1/lmr/bx/n/10 (-20) 1113.95| 
+ []
+
+
+Overfull \hbox (0.80344pt too wide) in paragraph at lines 1267--1268
+ []|\T1/lmr/m/n/10 (-20) 1113.37| 
+ []
+
+[19]
+Overfull \hbox (5.01035pt too wide) in paragraph at lines 1292--1293
+ []\T1/lmr/bx/n/10 (-20) Forward 
+ []
+
+
+Overfull \hbox (8.35158pt too wide) in paragraph at lines 1296--1297
+ []\T1/lmr/bx/n/10 (-20) Adjusted 
+ []
+
+
+Overfull \hbox (0.66812pt too wide) in paragraph at lines 1304--1304
+ []|\T1/lmr/bx/n/10 (-20) 0.355| 
+ []
+
+
+Overfull \hbox (0.66812pt too wide) in paragraph at lines 1305--1305
+ []|\T1/lmr/bx/n/10 (-20) 0.361| 
+ []
+
+
+Overfull \hbox (0.66812pt too wide) in paragraph at lines 1305--1305
+ []|\T1/lmr/bx/n/10 (-20) 0.376| 
+ []
+
+
+Overfull \hbox (0.77167pt too wide) in paragraph at lines 1305--1306
+ []|\T1/lmr/bx/n/10 (-20) 0.388| 
+ []
+
+
+Overfull \hbox (2.22801pt too wide) in paragraph at lines 1339--1340
+ []\T1/lmr/bx/n/10 (-20) Forward 
+ []
+
+
+Overfull \hbox (2.65251pt too wide) in paragraph at lines 1343--1344
+ []\T1/lmr/bx/n/10 (-20) Adjusted 
+ []
+
+
+Overfull \hbox (3.41203pt too wide) in paragraph at lines 1351--1351
+[]|\T1/lmr/bx/n/10 (-20) Strike|  
+ []
+
+
+Overfull \hbox (6.3243pt too wide) in paragraph at lines 1353--1353
+\T1/lmr/m/n/10 (-20) 0.00001|  
+ []
+
+
+Overfull \hbox (6.3243pt too wide) in paragraph at lines 1355--1355
+\T1/lmr/m/n/10 (-20) 0.00005|  
+ []
+
+
+Overfull \hbox (1.4243pt too wide) in paragraph at lines 1357--1357
+\T1/lmr/m/n/10 (-20) 0.0001|  
+ []
+
+
+Overfull \hbox (1.4243pt too wide) in paragraph at lines 1359--1359
+\T1/lmr/m/n/10 (-20) 0.0005|  
+ []
+
+[20]
+Overfull \hbox (1.79062pt too wide) in paragraph at lines 1384--1385
+ []\T1/lmr/bx/n/10 (-20) Forward 
+ []
+
+
+Overfull \hbox (180.35101pt too wide) in alignment at lines 1393--1407
+ [] [] [] [] [] [] [] 
+ []
+
+
+Package longtable Warning: Column widths have changed
+(longtable)                in table 11 on input line 1407.
+
+[21] [22] [23]
+Underfull \hbox (badness 2126) in paragraph at lines 1543--1547
+\T1/lmr/m/n/10 (+20) ences, Mon-e-tary Gam-bles, and Stock Mar-ket Par-tic-i-pa-tion: A Case
+ []
+
+
+Underfull \hbox (badness 1796) in paragraph at lines 1543--1547
+\T1/lmr/m/n/10 (+20) for Nar-row Fram-ing. \T1/lmr/m/it/10 (+20) Amer-i-can Eco-nomic Re-view\T1/lmr/m/n/10 (+20) , \T1/lmr/m/it/10 (+20) 96\T1/lmr/m/n/10 (+20) (4), 1069--1090.
+ []
+
+
+Underfull \hbox (badness 2103) in paragraph at lines 1553--1557
+\T1/lmr/m/n/10 (+20) tural es-ti-ma-tion of farm-ers' risk and am-bi-gu-ity pref-er-ences: A field
+ []
+
+[24]
+Underfull \hbox (badness 4995) in paragraph at lines 1563--1567
+\T1/lmr/m/n/10 (+20) in-sur-ance: Ap-ply-ing cu-mu-la-tive prospect the-ory to agri-cul-tural in-
+ []
+
+
+Underfull \hbox (badness 1436) in paragraph at lines 1563--1567
+\T1/lmr/m/n/10 (+20) sur-ance de-sign un-der nar-row fram-ing. \T1/lmr/m/it/10 (+20) PLOS ONE\T1/lmr/m/n/10 (+20) , \T1/lmr/m/it/10 (+20) 15\T1/lmr/m/n/10 (+20) (5), e0232267.
+ []
+
+
+Underfull \hbox (badness 1460) in paragraph at lines 1606--1609
+[]\T1/lmr/m/n/10 (+20) Gilboa, I., & Schmei-dler, D. (1989). Maxmin ex-pected util-ity with
+ []
+
+[25]
+Underfull \hbox (badness 2384) in paragraph at lines 1610--1613
+[]\T1/lmr/m/n/10 (+20) Hardaker, J. B., Huirne, R. B. M., An-der-son, J. R., & Lien, G.
+ []
+
+
+Overfull \hbox (5.86082pt too wide) in paragraph at lines 1620--1623
+\T1/lmr/m/n/10 (-20) tional Fer-til-izer As-so-ci-a-tion (IFA). https://www.ifastat.org/consumption/fertilizer-
+ []
+
+
+Overfull \hbox (48.28055pt too wide) in paragraph at lines 1644--1647
+\T1/lmr/m/it/10 (-20) can Sta-tis-ti-cal As-so-ci-a-tion\T1/lmr/m/n/10 (-20) , \T1/lmr/m/it/10 (-20) 101\T1/lmr/m/n/10 (-20) (475), 980--990. https://doi.org/10.1198/016214506000000672 
+ []
+
+[26]
+Overfull \hbox (0.19789pt too wide) in paragraph at lines 1674--1676
+[]\T1/lmr/m/n/10 (-20) Nelsen. (2006). \T1/lmr/m/it/10 (-20) An In-tro-duc-tion to Cop-u-las\T1/lmr/m/n/10 (-20) . Springer. https://doi.org/10.1007/0-
+ []
+
+
+Overfull \hbox (16.73595pt too wide) in paragraph at lines 1705--1708
+\T1/lmr/m/n/10 (-20) ogy of Choice. \T1/lmr/m/it/10 (-20) Sci-ence\T1/lmr/m/n/10 (-20) , \T1/lmr/m/it/10 (-20) 211\T1/lmr/m/n/10 (-20) (4481), 453--458. https://doi.org/10.1126/science.7455683 
+ []
+
+
+Underfull \hbox (badness 1194) in paragraph at lines 1713--1716
+[]\T1/lmr/m/n/10 (+20) Yohai, V. J. (1987). High Breakdown-Point and High Ef-fi-ciency Ro-
+ []
+
+[27]
+Underfull \hbox (badness 10000) in paragraph at lines 1786--1787
+
+ []
+
+[28]
+
+LaTeX Warning: File `media/image5.png' not found on input line 1831.
+
+
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:1831: Package pdftex.def Error: File `media/image5.png' not found: using draft setting.
+
+See the pdftex.def package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.1831 ....5in,height=4.23264in]{media/image5.png}
+                                                  
+Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+
+Overfull \hbox (124.88394pt too wide) in paragraph at lines 1831--1832
+[][] 
+ []
+
+
+Overfull \hbox (0.95384pt too wide) in paragraph at lines 1853--1854
+ []\T1/lmr/bx/n/10 (-20) strike 
+ []
+
+
+Overfull \hbox (0.7832pt too wide) in paragraph at lines 1855--1856
+ []\T1/lmr/bx/n/10 (-20) mean 
+ []
+
+
+Overfull \hbox (3.62376pt too wide) in paragraph at lines 1857--1858
+ []\T1/lmr/bx/n/10 (-20) median 
+ []
+
+
+Overfull \hbox (1.67017pt too wide) in paragraph at lines 1877--1877
+ []|\T1/lmr/m/n/10 (-20) 263.65| 
+ []
+
+
+Overfull \hbox (2.37508pt too wide) in paragraph at lines 1877--1877
+ []|\T1/lmr/m/n/10 (-20) 206.54| 
+ []
+
+
+Overfull \hbox (2.84502pt too wide) in paragraph at lines 1877--1878
+ []|\T1/lmr/m/n/10 (-20) 387.11| 
+ []
+
+
+Overfull \hbox (1.67017pt too wide) in paragraph at lines 1878--1878
+ []|\T1/lmr/m/n/10 (-20) 266.04| 
+ []
+
+
+Overfull \hbox (2.37508pt too wide) in paragraph at lines 1878--1878
+ []|\T1/lmr/m/n/10 (-20) 266.04| 
+ []
+
+
+Overfull \hbox (2.84502pt too wide) in paragraph at lines 1878--1879
+ []|\T1/lmr/m/n/10 (-20) 266.04| 
+ []
+
+
+Overfull \hbox (1.67017pt too wide) in paragraph at lines 1879--1879
+ []|\T1/lmr/m/n/10 (-20) 263.75| 
+ []
+
+
+Overfull \hbox (2.37508pt too wide) in paragraph at lines 1879--1879
+ []|\T1/lmr/m/n/10 (-20) 214.68| 
+ []
+
+
+Overfull \hbox (2.84502pt too wide) in paragraph at lines 1880--1881
+ []|\T1/lmr/m/n/10 (-20) 271.11| 
+ []
+
+
+Overfull \hbox (1.67017pt too wide) in paragraph at lines 1881--1881
+ []|\T1/lmr/m/n/10 (-20) 263.49| 
+ []
+
+
+Overfull \hbox (2.37508pt too wide) in paragraph at lines 1881--1881
+ []|\T1/lmr/m/n/10 (-20) 212.46| 
+ []
+
+
+Overfull \hbox (2.84502pt too wide) in paragraph at lines 1881--1882
+ []|\T1/lmr/m/n/10 (-20) 273.33| 
+ []
+
+
+Overfull \hbox (1.67017pt too wide) in paragraph at lines 1882--1882
+ []|\T1/lmr/m/n/10 (-20) 263.12| 
+ []
+
+
+Overfull \hbox (2.37508pt too wide) in paragraph at lines 1882--1882
+ []|\T1/lmr/m/n/10 (-20) 210.24| 
+ []
+
+
+Overfull \hbox (2.84502pt too wide) in paragraph at lines 1882--1883
+ []|\T1/lmr/m/n/10 (-20) 276.29| 
+ []
+
+
+Overfull \hbox (1.67017pt too wide) in paragraph at lines 1883--1883
+ []|\T1/lmr/m/n/10 (-20) 263.86| 
+ []
+
+
+Overfull \hbox (2.37508pt too wide) in paragraph at lines 1883--1883
+ []|\T1/lmr/m/n/10 (-20) 209.50| 
+ []
+
+
+Overfull \hbox (2.84502pt too wide) in paragraph at lines 1883--1884
+ []|\T1/lmr/m/n/10 (-20) 281.48| 
+ []
+
+
+Overfull \hbox (1.67017pt too wide) in paragraph at lines 1884--1884
+ []|\T1/lmr/m/n/10 (-20) 263.66| 
+ []
+
+
+Overfull \hbox (2.37508pt too wide) in paragraph at lines 1884--1884
+ []|\T1/lmr/m/n/10 (-20) 208.02| 
+ []
+
+
+Overfull \hbox (2.84502pt too wide) in paragraph at lines 1884--1885
+ []|\T1/lmr/m/n/10 (-20) 288.89| 
+ []
+
+
+Overfull \hbox (6.57016pt too wide) in paragraph at lines 1885--1885
+ []|\T1/lmr/m/n/10 (-20) 1162.92| 
+ []
+
+
+Overfull \hbox (2.37508pt too wide) in paragraph at lines 1886--1886
+ []|\T1/lmr/m/n/10 (-20) 279.36| 
+ []
+
+
+Overfull \hbox (7.74501pt too wide) in paragraph at lines 1886--1887
+ []|\T1/lmr/m/n/10 (-20) 2316.85| 
+ []
+
+
+Overfull \hbox (6.57016pt too wide) in paragraph at lines 1887--1887
+ []|\T1/lmr/m/n/10 (-20) 1160.53| 
+ []
+
+
+Overfull \hbox (2.37508pt too wide) in paragraph at lines 1887--1887
+ []|\T1/lmr/m/n/10 (-20) 262.26| 
+ []
+
+
+Overfull \hbox (7.74501pt too wide) in paragraph at lines 1888--1889
+ []|\T1/lmr/m/n/10 (-20) 2395.28| 
+ []
+
+
+Overfull \hbox (6.57016pt too wide) in paragraph at lines 1889--1889
+ []|\T1/lmr/m/n/10 (-20) 1162.82| 
+ []
+
+
+Overfull \hbox (2.37508pt too wide) in paragraph at lines 1889--1889
+ []|\T1/lmr/m/n/10 (-20) 271.21| 
+ []
+
+
+Overfull \hbox (7.74501pt too wide) in paragraph at lines 1890--1891
+ []|\T1/lmr/m/n/10 (-20) 2390.21| 
+ []
+
+
+Overfull \hbox (6.57016pt too wide) in paragraph at lines 1891--1891
+ []|\T1/lmr/m/n/10 (-20) 1163.07| 
+ []
+
+
+Overfull \hbox (2.37508pt too wide) in paragraph at lines 1891--1891
+ []|\T1/lmr/m/n/10 (-20) 273.44| 
+ []
+
+
+Overfull \hbox (7.74501pt too wide) in paragraph at lines 1891--1892
+ []|\T1/lmr/m/n/10 (-20) 2387.99| 
+ []
+
+
+Overfull \hbox (6.57016pt too wide) in paragraph at lines 1892--1892
+ []|\T1/lmr/m/n/10 (-20) 1163.45| 
+ []
+
+
+Overfull \hbox (2.37508pt too wide) in paragraph at lines 1892--1892
+ []|\T1/lmr/m/n/10 (-20) 275.66| 
+ []
+
+
+Overfull \hbox (7.74501pt too wide) in paragraph at lines 1892--1893
+ []|\T1/lmr/m/n/10 (-20) 2385.02| 
+ []
+
+
+Overfull \hbox (6.57016pt too wide) in paragraph at lines 1893--1893
+ []|\T1/lmr/m/n/10 (-20) 1162.71| 
+ []
+
+
+Overfull \hbox (7.74501pt too wide) in paragraph at lines 1893--1894
+ []|\T1/lmr/m/n/10 (-20) 2379.84| 
+ []
+
+
+Overfull \hbox (6.57016pt too wide) in paragraph at lines 1894--1894
+ []|\T1/lmr/m/n/10 (-20) 1162.90| 
+ []
+
+
+Overfull \hbox (2.37508pt too wide) in paragraph at lines 1894--1894
+ []|\T1/lmr/m/n/10 (-20) 277.88| 
+ []
+
+
+Overfull \hbox (7.74501pt too wide) in paragraph at lines 1894--1895
+ []|\T1/lmr/m/n/10 (-20) 2372.43| 
+ []
+
+
+Overfull \hbox (1.87508pt too wide) in paragraph at lines 1897--1897
+ \T1/lmr/m/n/10 (-20) 121.07| 
+ []
+
+
+Overfull \hbox (2.84502pt too wide) in paragraph at lines 1898--1899
+ []|\T1/lmr/m/n/10 (-20) 115.99| 
+ []
+
+
+Overfull \hbox (2.84502pt too wide) in paragraph at lines 1899--1900
+ []|\T1/lmr/m/n/10 (-20) 113.77| 
+ []
+
+
+Overfull \hbox (2.84502pt too wide) in paragraph at lines 1900--1901
+ []|\T1/lmr/m/n/10 (-20) 110.81| 
+ []
+
+
+Overfull \hbox (2.84502pt too wide) in paragraph at lines 1901--1902
+ []|\T1/lmr/m/n/10 (-20) 105.62| 
+ []
+
+[29]
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:1906: Undefined control sequence.
+\__hook enddocument ->\ifTRP@rerun 
+                                   \PackageWarningNoLine {transparent}{Rerun...
+l.1906 \end{document}
+                     
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+
+Package transparent Warning: Rerun to get transparencies right.
+
+c:/Users/spada001/OneDrive - Wageningen University & Research/publication_2/4_Documents/Input price risk management tools.tex:1906: Extra \fi.
+\__hook enddocument ...t transparencies right}\fi 
+                                                  \__hook_toplevel enddocume...
+l.1906 \end{document}
+                     
+I'm ignoring this; it doesn't match any \if.
+
+[30]
+
+Package longtable Warning: Table widths have changed. Rerun LaTeX.
+
+(Input price risk management tools.aux)
+
+LaTeX Warning: There were undefined references.
+
+
+LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
+
+ ) 
+Here is how much of TeX's memory you used:
+ 15635 strings out of 478864
+ 247489 string characters out of 2858508
+ 674048 words of memory out of 3000000
+ 32852 multiletter control sequences out of 15000+600000
+ 490225 words of font info for 208 fonts, out of 8000000 for 9000
+ 1141 hyphenation exceptions out of 8191
+ 94i,17n,94p,9785b,463s stack positions out of 5000i,500n,10000p,200000b,80000s
+{C:/Program Files/MiKTeX/fonts/enc/dvips/lm/lm-ts1.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/lm/lm-ec.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/lm/lm-rm.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/lm/lm-mathit.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/lm/lm-mathsy.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/lm/lm-mathex.enc} <C:\Users\spada001\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecrm1000.pk><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmbx10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmbx12.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmbx7.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmex10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmmi10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmmi5.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmmi7.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmr10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmr5.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmr6.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmr7.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmr8.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmri10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmsy10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmsy5.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmsy7.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmtt10.pfb>
+Output written on "Input price risk management tools.pdf" (30 pages, 461616 bytes).
+PDF statistics:
+ 446 PDF objects out of 1000 (max. 8388607)
+ 95 named destinations out of 1000 (max. 500000)
+ 51413 words of extra memory for PDF output out of 51595 (max. 10000000)
+

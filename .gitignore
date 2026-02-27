@@ -1,5 +1,9 @@
-# R user files
+# user files
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
+
+# Claude
+.claude
+CLAUDE.md

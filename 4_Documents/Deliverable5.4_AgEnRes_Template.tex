@@ -1,0 +1,927 @@
+\documentclass[12pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{tabularx}
+\usepackage{pdflscape}
+\usepackage[table]{xcolor}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+% Title page info
+\title{\textbf{D5.4 Development of Input Price Risk Management Tools}}
+\author{
+    Riccardo Spada\textsuperscript{1} \and
+    Lukas Akerman\textsuperscript{2} \and
+    Simone Cerroni\textsuperscript{3} \and
+    Tobias Dalhaus\textsuperscript{1} \and
+    Miranda P.M. Meuwissen\textsuperscript{1} \and
+    Laura Moritz\textsuperscript{3}
+}
+\date{}
+
+\begin{document}
+
+% ============================================================
+% TITLE PAGE
+% ============================================================
+
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+
+{\LARGE \textbf{AgEnRes} \par}
+\vspace{0.5cm}
+{\large Analysing of Fossil-Energy Dependence in Agriculture to Increase Resilience against Input Price Fluctuations \par}
+
+\vspace{2cm}
+
+{\Huge \textbf{Deliverable 5.4} \par}
+\vspace{0.5cm}
+{\Large Development of Input Price Risk Management Tools \par}
+
+\vspace{2cm}
+
+\begin{tabular}{ll}
+\toprule
+Project no. & 101136474 \\
+Project acronym: & AgEnRes \\
+Project title: & Analysing of Fossil-Energy Dependence in Agriculture \\
+ & to Increase Resilience against Input Price Fluctuations \\
+Call: & HORIZON-CL6-2023-CLIMATE-01-06 \\
+Start date of project: & 01.01.2024 \\
+Duration: & 48 months \\
+Deliverable title: & D5.4 (Development of input price risk management tools) \\
+Due date of deliverable: & 31.12.2025 \\
+Actual date of submission: & 19.12.2025 \\
+Deliverable Lead Partner: & Wageningen University \& Research \\
+Dissemination level: & Public \\
+\bottomrule
+\end{tabular}
+
+\vspace{1.5cm}
+
+\begin{tabular}{ll}
+\toprule
+\textbf{Name} & \textbf{Organization} \\
+\midrule
+Riccardo Spada & Wageningen University \& Research \\
+Lukas Akerman & Swedish University of Agricultural Sciences \\
+Simone Cerroni & University of Trento \\
+Tobias Dalhaus & Wageningen University \& Research \\
+Miranda P.M. Meuwissen & Wageningen University \& Research \\
+Laura Moritz & University of Trento \\
+\bottomrule
+\end{tabular}
+
+\vfill
+\end{titlepage}
+
+% ============================================================
+% DISCLAIMER
+% ============================================================
+\section*{Disclaimer}
+\addcontentsline{toc}{section}{Disclaimer}
+
+The content of the publication herein is the sole responsibility of the authors(s), and it does not necessarily represent the views expressed by the European Commission or its services.
+
+While AgEnRes is funded by the European Union, views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or the European Research Executive Agency (REA). Neither the European Union nor the European Research Executive Agency (REA) can be held responsible for them.
+
+While the information contained in the documents is believed to be accurate, the authors(s) or any other participant in the AgEnRes consortium make no warranty of any kind with regard to this material including, but not limited to the implied warranties of merchantability and fitness for a particular purpose.
+
+Neither the AgEnRes Consortium nor any of its members, their officers, employees, or agents shall be responsible or liable in negligence or otherwise howsoever in respect of any inaccuracy or omission herein.
+
+Without derogating from the generality of the foregoing neither the AgEnRes Consortium nor any of its members, their officers, employees, or agents shall be liable for any direct or indirect or consequential loss or damage caused by or arising from any information advice or inaccuracy or omission herein.
+
+\paragraph{Copyright notice.}
+\copyright~AgEnRes Consortium, 2024--2027. This deliverable contains original unpublished work except where clearly indicated otherwise. Acknowledgement of previously published material and of the work of others has been made through appropriate citation, quotation, or both. Reproduction is authorized provided the source is acknowledged.
+
+\paragraph{License.} This work is licensed under a Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.
+
+\newpage
+
+% ============================================================
+% EXECUTIVE SUMMARY
+% ============================================================
+\section*{Executive Summary}
+\addcontentsline{toc}{section}{Executive Summary}
+
+Recent geopolitical crises have caused substantial price volatility in agricultural input markets such as markets for nitrogen-based fertilizers. While in the long-run farms must reduce dependency on fossil energy intensive inputs, in the short run, price risk can be mitigated by financial tools (futures, options, price insurance). Nonetheless, farmers' adoption of financial tools remains low and possibly lower than standard economic theory of utility maximization would typically suggest.
+
+The adoption of risk management tools might be better explained from theories that depart from pure profit maximization, and Expected Utility Theory (EUT), that incorporates risk preferences. Additionally, adoption decisions might be narrowly framed as stand-alone investments (narrow framing), instead of a risk management strategy (broad framing). For this reason, theories that depart from EUT assumptions, most prominently Cumulative Prospect Theory (CPT), have been effectively used to better explain the adoption risk of management tools.
+
+In this report, we design and evaluate a financial contract for input price risk management, specifically adjusted to fit farmers' behavioral preferences (i.e., by introducing a price ceiling to a forward contract to address loss aversion). To evaluate contract performance, we employ a stochastic simulation. Our case study is a representative farm in West Germany that produces winter wheat with nitrogen fertilizers as an input. We then test how the adjusted contract affects utility of simulated profits under different decision theories (EUT and CPT) and decision framings (broad vs.\ narrow).
+
+The simulation yielded divergent results based on the decision-making framework analyzed. Under standard EUT, the behaviorally adjusted contract seems attractive to farmers, but only when the decision is broadly framed as a risk management tool. If framed narrowly as an investment, it offers no benefits. Under CPT, the adjusted contract is unattractive to farmers regardless of the decision framing. This framing potentially explains low take up rates of price risk management tools in practice.
+
+Although input prices sustained substantial volatility, we find that their impact on famers' outcomes is limited. Under a broad framing, profit variability is mainly driven by output prices and yields fluctuations. Under a narrow framing, thus considering only input price variability, adoption does not appear to be justified.
+
+\newpage
+
+% ============================================================
+% LIST OF ACRONYMS
+% ============================================================
+\section*{List of Acronyms}
+\addcontentsline{toc}{section}{List of Acronyms}
+
+\begin{tabular}{ll}
+CE & Certainty Equivalent \\
+CPT & Cumulative Prospect Theory \\
+EUT & Expected Utility Theory \\
+N & Nitrogen \\
+\end{tabular}
+
+\newpage
+
+% ============================================================
+% LISTS OF FIGURES AND TABLES
+% ============================================================
+\listoffigures
+\listoftables
+
+\newpage
+\tableofcontents
+\newpage
+
+% ============================================================
+% 1. INTRODUCTION
+% ============================================================
+\section{Introduction}
+
+In recent decades, energy-intensive inputs in agriculture, such as mineral fertilizers, have experienced considerable volatility, putting farmers' overall income and, thereby, food security at risk. Inorganic fertilizers, whose production requires substantial amounts of energy, stand out as a critical component for modern agriculture \citep{EuropeanCommission2022, FAO2024}. In particular, nitrogen-based fertilizers are the most important nutrient for crop production \citep{IFA2022}. However, price shocks caused by recent geopolitical crises are not completely transmitted to output prices \citep{Dong2025}. Higher prices can thus reduce farmers' ability to apply optimal nutrient levels, thereby lowering yields and jeopardizing food security.
+
+While in the long-run farms must reduce dependency on fossil energy intensive inputs, price risk management can mitigate the financial exposure to price volatility in the short run. A strategy to manage price risk is to use financial tools such as forward contracts, futures, options, and price insurance \citep{Hardaker2015}. But farmers' adoption of such tools is lower than what would be expected from utility-maximizing behavior of a risk-averse decision-maker \citep{Spada2025}.
+
+Many farmers' decisions deviate from pure profit maximization and are better explained by considering risk preferences by using an expected utility framework, such as fertilizer decision \citep{Moritz2025}. Nonetheless, a growing body of empirical evidence shows that farmers' choices often depart from the assumptions of Expected Utility Theory (EUT). For example, producers display loss aversion and probability weighting \citep{Finger2024}, consistent with Cumulative Prospect Theory (CPT) \citep{TverskyKahneman1992}. Additionally, adoption decisions might be narrowly framed as stand-alone investments \citep{Barberis2006}, instead of a risk management strategy within a broader farm portfolio (broad framing). Therefore, CPT has been effectively used to better explain adoption decisions of risk management tools \citep{Mattos2008, Babcock2015}. Further, agricultural commodity price risk management literature focuses mainly on output prices \citep{Spada2025}, underscoring the need for further research on the input side.
+
+In this report, we aim to adjust contract specifics of financial tools for input price risk management to better fit farmers' behavioral preferences. Based on a simulation exercise, we will show how contract adjustments, such as introducing a price ceiling, potentially affect farmers' utility under EUT and CPT, as well as under broad and narrow framing. This leads to a conclusion about which contract specifics might be suitable under different farmers' preferences and framing scenarios.
+
+To achieve this, we first provide a theoretical background and conceptualize how farmers might assess this decision under different decision theories (EUT and CPT) and framings (broad and narrow). We then build a simplified profit function of wheat production under risk. Subsequently, we define contract specifications of price risk management tools that might better fit farmers' behavioral preferences. We then employ a bio-economic model by integrating a crop simulation with a decision models under risk to test how adjusted contracts affect utility values \citep{Finger2012}. First, we parametrize the bio-economic model using simulated nitrogen and yield relationships from a crop model and an econometric procedure to estimate stochastic relations between nitrogen and yield. Second, we estimate nitrogen and yield price dynamics. Lastly, we incorporate the obtained information in the economic decision models and evaluate the effect on the outcome distribution for the different models and framing.
+
+We find that under standard EUT preferences the behaviorally adjusted contract is attractive to farmers when broadly framed as a risk management tool, but when the decision is narrowly framed as an investment, we find that it doesn't provide any benefit. Under CPT preferences, the adjusted contract is not attractive to farmers, both when broadly and narrowly framed. We conclude that, while promising, to make these types of contracts attractive to farmers, a more holistic approach that considers also output prices might provide better results.
+
+The remainder of the report is organized as follows. In section~\ref{sec:theory}, we lay down the theoretical background. First, we review the most common theories of farmers' decision-making under risk and discuss the different framings. Second, we develop a bio-economic production model for fertilizer price risk decision-making. Building on this, we propose behavioral adjustments to risk management tools. In section~\ref{sec:methodology}, we describe our methodology and in section~\ref{sec:data}, we present the data and the assumptions used. We present the results in section~\ref{sec:results} and discuss them in section~\ref{sec:discussion}. We conclude in section~\ref{sec:conclusions}.
+
+% ============================================================
+% 2. THEORETICAL BACKGROUND
+% ============================================================
+\section{Theoretical background}
+\label{sec:theory}
+
+\subsection{Theoretical frameworks on decision-making under risk}
+
+Farmer's choices can be modeled using a variety of theoretical frameworks that capture different attitudes toward risk. We define risk as situations where the probabilities of different outcomes are known \citep{Knight1921}. Traditional approaches that model decisions under risk often rely on EUT. However, empirical evidence suggests that decision-makers may deviate from purely EUT maximizing behavior. To capture these deviations, alternative models, most prominently Cumulative Prospect Theory (CPT) by \citet{TverskyKahneman1992}, have been proven useful to better describe farmer behavior \citep{Rommel2023}. CPT accounts for loss aversion, probability weighting, and reference dependence.
+
+Under standard EUT assumptions, a common approach is to model farmers' behavior as maximizer of the certainty equivalent (CE). The CE of a risky outcome $\tilde{\pi}$ denotes the guaranteed payoff level that has the same utility as the expected utility of the risky outcome. Risk-averse farmers are willing to reduce risk exposure by paying a risk premium. The expected outcome $E[\pi]$ is thus reduced by the risk premium as follows:
+\begin{equation}
+CE = E[\pi] - \frac{r}{2} \cdot \text{Var}[\pi]
+\label{eq:CE}
+\end{equation}
+where $r$ is absolute risk aversion. While still relevant for normative assessments, farmers decisions about financial tools are in general not consistent with EUT (e.g., \citealp{Babcock2015}).
+
+Behavioral economics extensions of EUT might better explain actual farmers' behavior. Empirical evidence shows that decision-makers often weigh losses more heavily than equivalent gains (loss aversion) or perceive distorted probabilities, such as overweighting low-probability outcomes and underweight large ones (probability weighting). These behavioral biases might influence risk management tools adoption decisions. Especially if contract are designed to limit exposure to outcomes that carry high psychological costs and are perceived as relatively likely.
+
+Thus, assuming CPT preferences, where gains and losses are considered as deviations from a reference point, decision-makers might maximize the prospect value $V$ of a risky outcome as:
+\begin{equation}
+V = \sum_{i} w_i \cdot v(x_i)
+\label{eq:CPT}
+\end{equation}
+where single prospect outcomes are transformed into a value function $v(\cdot)$ that incorporates risk-aversion over gains and risk-seeking behavior over losses:
+\begin{equation}
+v(x) = \begin{cases}
+(x - \text{ref})^{\alpha} & \text{if } x \geq \text{ref} \\
+-\lambda \cdot (\text{ref} - x)^{\alpha} & \text{if } x < \text{ref}
+\end{cases}
+\label{eq:value}
+\end{equation}
+where $\text{ref}$ is the reference point, $\lambda$ is the loss-aversion parameter, and $\alpha$ is the risk-aversion parameter. For each outcome, there is a probability of occurrence $p_i$. These probabilities are translated into decision weights by a function $w(\cdot)$, which captures the tendency to overweight small probabilities and underweight large ones. Several functional forms have been proposed for the probability weighting function, but the most commonly used are those introduced by \citet{TverskyKahneman1992}, which assumes different weighting in the domains of gains and losses (Eq.~\ref{eq:TK}), and \citet{Prelec1998}, which assumes equal weighting in the two domains (Eq.~\ref{eq:Prelec}):
+\begin{equation}
+w^{+}(p) = \frac{p^{\gamma^{+}}}{(p^{\gamma^{+}} + (1-p)^{\gamma^{+}})^{1/\gamma^{+}}}, \quad w^{-}(p) = \frac{p^{\gamma^{-}}}{(p^{\gamma^{-}} + (1-p)^{\gamma^{-}})^{1/\gamma^{-}}}
+\label{eq:TK}
+\end{equation}
+\begin{equation}
+w(p) = \exp(-(-\ln p)^{\gamma})
+\label{eq:Prelec}
+\end{equation}
+in both cases, $p$ is the objective probability and $\gamma$ defines the curvature of the function. Assuming ordered outcomes, the decision weight for gains and losses are defined as:
+\begin{equation}
+\pi_i^{+} = w^{+}\left(\sum_{j=i}^{n} p_j\right) - w^{+}\left(\sum_{j=i+1}^{n} p_j\right), \quad \pi_i^{-} = w^{-}\left(\sum_{j=1}^{i} p_j\right) - w^{-}\left(\sum_{j=1}^{i-1} p_j\right)
+\label{eq:weights}
+\end{equation}
+
+\subsection{Decision framing}
+
+Decision-makers can evaluate risky decisions using different mental framing \citep{TverskyKahneman1981}. With a broad framing, decision-makers might consider a risky choice in conjunction with other risks. In this case, input contracting is considered as a tool for managing farming risk and utility is defined over total wealth or profits. In contrast, under narrow framing \citep{Barberis2006}, decision-makers might consider the same choice independently from other risks. In this case input contracting is viewed as a stand-alone investment and utility is defined by taking into account each choice in isolation, rather than part of a broader farm strategy. Although, narrow framing might lead to biased decisions, it might better explain farmers' behavior. For example it has been effective in explaining observed crop insurance choices \citep{Babcock2015}.
+
+\subsection{Economic model}
+
+To conceptualize farmers' input price risk management decisions, we build a simplified model of crop production for winter wheat, with a particular focus on (synthetic) nitrogen fertilizer (N) and the associated risks. Following the initial crop choice, given the price fluctuations until the fertilizer is used, farmers make fertilizer purchasing decisions under risk. By committing to buy a specific quantity of fertilizer at an agreed price and future date, forward contracting can effectively mitigate exposure to price risk \citep{Hardaker2015}.
+
+We consider a static model of a representative farmer who produces a single commodity (winter wheat) using a single input (synthetic nitrogen fertilizer). The expected farmer's profits $\pi$ are defined as revenue minus costs:
+\begin{equation}
+\pi = p_y \cdot y - p_x \cdot x
+\label{eq:profit}
+\end{equation}
+where $p_y$ is the output price, $y$ the expected yield, $p_x$ the fertilizer price, and $x$ the fertilizer quantity. We assume that, once the crop is determined at time $t_0$, the farmer knows the associated standard fertilizer needs for the season. All the volume is then either purchased at market price or through a forward contract. When farmers simply buy fertilizers close to application, they pay the stochastic spot price $p_x^s$. When forward contracting, the input costs become fixed $p_x^f$, with the forward price calculated as:
+\begin{equation}
+p_x^f = p_x^s(t_0) \cdot e^{r_f \cdot T}
+\label{eq:forward}
+\end{equation}
+where $p_x^s(t_0)$ is the fertilizer spot price at $t_0$, $r_f$ is the risk-free rate, and $T$ is the delivery time. We also assume no fixed and variable costs (e.g., information gathering expenses or commissions) for entering the contract. We consider forward contracting as mathematically equivalent to a buy-and-hold strategy. If the input is bought at time $t_0$, the cost at time $T$ is the current spot price plus storage costs. With a forward contract, the firm instead commits to a purchase price $p_x^f$ that already reflects these same costs. Hence, forward contracting reproduces the same outcome as purchasing and storing, while avoiding holding inventory. In this context we assume the cost of forward contracting for fertilizers to be zero.
+
+\subsection{Behaviorally adjusted contract design}
+
+In addition to the option of buying fertilizers at the spot price $p_x^s$ and forward contracting with a supplier, thus fixing the price $p_x^f$, we introduce an ``insurance'' mechanism to the contract that sets a price ceiling. By paying a premium $\rho$, if the fertilizer price is above a certain threshold $K$, the insurance payoff $I$ would ensure that the price farmers pay for fertilizer would be capped. This mechanism thus functions as a European call option where the payout amount is made whenever the fertilizer spot price at time $T$ is above the farm's individual threshold price, otherwise the payout is zero:
+\begin{equation}
+I = \max(p_x^s(T) - K, 0)
+\label{eq:payoff}
+\end{equation}
+
+In this case, and unlike the traditional forward contract, the contract is not free to enter. Here, the supplier carries all the risk and should thus be compensated. To calculate the premium of an European call option, we discount its expected payoff:
+\begin{equation}
+\rho = e^{-r_f \cdot T} \cdot E[\max(p_x^s(T) - K, 0)]
+\label{eq:premium}
+\end{equation}
+
+Traditional forward contracts primarily address risk aversion by fixing the price and eliminating exposure to future price volatility. In contrast, the proposed adjusted contract (i.e., maximum price contract) targets downside risk aversion and loss aversion by offering protection against adverse price movements while preserving the opportunity to benefit from price declines. Available purchasing choices are summarized in Table~\ref{tab:contract_design}.
+
+\begin{table}[H]
+\centering
+\caption{Overview of traditional and adjusted contract design}
+\label{tab:contract_design}
+\begin{tabular}{lccc}
+\toprule
+ & Spot price & Forward contract & Adjusted contract \\
+\midrule
+Fertilizer cost & $p_x^s$ & $p_x^f$ & $\min(p_x^s, K)$ \\
+Contract cost & -- & -- & $\rho$ \\
+Mechanism & -- & Price fixing & Price ceiling \\
+Behavior targeted & -- & Risk aversion & Downside risk aversion/Loss aversion \\
+\bottomrule
+\end{tabular}
+
+\smallskip
+\footnotesize Note: we assume no cost of storage for the forward contract.
+\end{table}
+
+\subsection{Profit functions}
+
+Farmers can now choose whether to buy part or all their fertilizers needs through a forward contract or the adjusted contract. For a forward contract, farmers perceive the value of their contract choice as positive or negative (i.e.\ gain or loss) depending on whether they paid more or less than the underlying spot price. In this case, the payoff is calculated as:
+\begin{equation}
+\pi^{fwd} = (p_x^s - p_x^f) \cdot x
+\label{eq:fwd_payoff}
+\end{equation}
+
+For the adjusted contract, a gain (loss) occurs when the payoff received from the insurance mechanism $I$ is greater (smaller) than the premium paid $\rho$. The adjusted contract benefits are then calculated as the payoff minus the premium paid:
+\begin{equation}
+\pi^{adj} = (I - \rho) \cdot x
+\label{eq:adj_payoff}
+\end{equation}
+
+In the case of broad framing, profits are then defined as:
+\begin{equation}
+\pi^{broad} = p_y \cdot y - p_x \cdot x + \pi^{contract}
+\label{eq:broad}
+\end{equation}
+with $\pi^{contract} \in \{0, \pi^{fwd}, \pi^{adj}\}$, in the case of no contract, forwards, or adjusted contract respectively. In the case of narrow framing, utility is narrowly defined by considering only the decision at hand:
+\begin{equation}
+\pi^{narrow} = \pi^{contract}
+\label{eq:narrow}
+\end{equation}
+
+% ============================================================
+% 3. METHODOLOGY
+% ============================================================
+\section{Methodology}
+\label{sec:methodology}
+
+In this section we present the different economic decision models, the biophysical and statistical approaches used to estimate the models, and the computation method of the adjusted contract price. For the decision under broad framing, we first estimate the interactions between nitrogen application and crop yield, and the relationship between nitrogen and wheat prices. The data sources and the estimation will be discussed in the subsequent sections.
+
+\subsection{Nitrogen--yield relationship}
+
+We estimate nitrogen-yield relationships using data from the Environmental Policy Integrated Climate-based (EPIC; \citealp{Williams1995}) crop model, where different levels of nitrogen are used to simulate crop yield. Simulated observations of winter wheat yield for different levels of nitrogen applications are then used in a production function to estimate the statistical relationship between nitrogen and yield under risk. The estimation employed here, based on \citet{JustPope1978, JustPope1979}, allows inputs to influence both the mean and the variability of outputs:
+\begin{equation}
+y = f(N) + h(N) \cdot \varepsilon
+\label{eq:justpope}
+\end{equation}
+where $f(\cdot)$ represents the expected yield (production function) and $h(\cdot)$ the standard deviation of yield (variation function), with the assumption that $f'(N) > 0$ and $f''(N) < 0$. Following \citet{FingerHediger2008}, we employ a production function estimation of the form:
+\begin{equation}
+y = \beta_0 + \beta_1 N^{0.5} + \beta_2 N + \varepsilon
+\label{eq:prodfunc}
+\end{equation}
+
+If $\beta_1 > 0$ and $\beta_2 < 0$, the function shows decreasing marginal productivity of nitrogen, where yields are monotonically increasing up to some point of nitrogen use and then monotonically decreasing. We then define yield variation as the absolute difference between observed and expected yields \citep{FingerSchmid2008}. Therefore, we regress residual from the production function estimation in Eq.~(\ref{eq:prodfunc}) ($|\hat{\varepsilon}|$) to estimate the yield variation function, i.e., the relation between the level of nitrogen input and yield variance:
+\begin{equation}
+|\hat{\varepsilon}| = \gamma_0 + \gamma_1 N^{0.5} + \gamma_2 N + u
+\label{eq:varfunc}
+\end{equation}
+
+The production and yield variability function are estimated with the MM-estimator \citep{Yohai1987} to reduce potential influences of outlying observations on estimation results \citep{Finger2013}.
+
+\subsection{Nitrogen prices--Yield prices relationship}
+
+To estimate the joint dynamic price processes of nitrogen $p_x$ and wheat $p_y$, we use a quantile vector autoregression (QVAR) and a copula approach \citep{LiChavas2023}. Stochastic price dynamics are represented by a general autoregressive process of the form:
+\begin{equation}
+p_t = g(p_{t-1}, \ldots, p_{t-L})
+\label{eq:AR}
+\end{equation}
+where the distribution functions $g(\cdot)$ explain the contemporaneous prices through their lags. We are interested in the joint distribution function described as:
+\begin{equation}
+F(p_{x,t}, p_{y,t} | Z_{t-1})
+\label{eq:joint}
+\end{equation}
+where $Z_{t-1}$ includes lagged realizations of all prices. To estimate the joint distribution $F$, we first derive the marginal distribution functions using a QVAR model:
+\begin{align}
+F_{x}(p_{x,t} | Z_{t-1}) \label{eq:margx} \\
+F_{y}(p_{y,t} | Z_{t-1}) \label{eq:margy}
+\end{align}
+
+We then rely on Sklar's theorem \citep{Sklar1959}, and use a copula $C$ \citep{Nelsen2006} to estimate the following relationship:
+\begin{equation}
+F(p_{x,t}, p_{y,t} | Z_{t-1}) = C(F_x, F_y | Z_{t-1})
+\label{eq:copula}
+\end{equation}
+
+\subsection{Adjusted contract pricing}
+
+We derive the contract pricing with a burn analysis. We implement this by determining the discounted average payoff of the contract over $S$ simulations. The general pricing formula (Eq.~\ref{eq:premium}) is then:
+\begin{equation}
+\rho = e^{-r_f \cdot T} \cdot \frac{1}{S} \sum_{s=1}^{S} \max(p_{x,s}^s(T) - K, 0)
+\label{eq:burn}
+\end{equation}
+
+We specify the assumptions needed for the calculation following our decision framework (section~\ref{sec:theory}). The planning horizon is set for one season, while the considered contract duration is six months (from crop choice/planting in early October to the first fertilizer application in early March). Different strike prices will be analyzed based on the simulated price distribution, allowing for evaluation of contracts across different price protection threshold. A standard risk-free interest rate of 3\% is applied to discount future payoffs to present values.
+
+\subsection{Monte Carlo simulation of utility under different decision theories and framing}
+
+The previously described information on yield, price dynamics, and contract cost, enter the different economic models of farmers' decision-making. More specifically, we analyse the impact on utility level for different decision theories and different framing. In the case farmers rely on a broad decision framing, profits are derived from Eq.~(\ref{eq:broad}). Under narrow framing, farmers' profits are instead derived from Eq.~(\ref{eq:narrow}). We will then evaluate the calculated profits under EUT and CPT.
+
+Assumptions regarding the representative farm characteristics, and the behavioral parameters entering the models have to be specified. For a German representative arable farm that cultivates winter wheat, N fertilizer requirement are around 200 kg N/ha, sowing is usually in late October, and harvest early August \citep{HernandezOchoa2023}. Absolute risk aversion for the EUT specification $r$ is considered between 0.00001 (less risk-averse) and 0.001 (more risk-averse). Structural parameters for CPT are derived from experimental evidence available in the literature. Final prospect values are dependent on the reference point, risk aversion $\alpha$, loss aversion $\lambda$, and probability distortion $\gamma$. Broad evidence on structural parameter elicitation is available for European farmers in general and German farmers in particular \citep{Bougherara2017, Finger2024, Rommel2023}. The considered parameters values are: $\alpha = 0.74$, $\lambda = 1.67$, and $\gamma = 0.6$. Alternative parametrization is considered for robustness checks. As reference points, we follow \citet{KoszegiRabin2007} argument to use expected outcomes in the case of broad framing (in our case expected profit per hectare), and zero for narrow framing.
+
+% ============================================================
+% 4. DATA
+% ============================================================
+\section{Data}
+\label{sec:data}
+
+In this section we present: (1) the dataset used to estimate the nitrogen-yield relationship, and (2) the price data. Price data for fertilizers and wheat prices at farm level was obtained for Cologne Lowland area, in the southwest of the German Federal state of North Rhine-Westphalia. We thus focus our analysis of fertilizer-yield relationship on the same geographic area.
+
+\subsection{Yield data}
+
+We use data generated from the European implementation of the EPIC model (EPIC-IIASA; \citealp{Balkovic2013}). We focus on a representative location in the Cologne Lowland area, a highly productive region specialized on crop farms. The dataset includes winter wheat yields for different levels of N applications, management practices and weather scenarios. Table~\ref{tab:yield_summary} presents summary statistics of generated yield levels for different N application rates. It shows a linear relationship between N application rates and the level of wheat yield.
+
+\begin{table}[H]
+\centering
+\caption{Summary statistics of simulated wheat yield (t/ha) from the EPIC-IIASA crop model}
+\label{tab:yield_summary}
+\begin{tabular}{lccccc}
+\toprule
+N application rate (kg N/ha) & Median & MAD\textsuperscript{a} & Min & Max & Observations \\
+\midrule
+10 & 1.6 & 0.18 & 1.16 & 2.31 & 35 \\
+50 & 3.65 & 0.69 & 2.02 & 4.65 & 140 \\
+100 & 5.76 & 0.87 & 3.05 & 7.15 & 140 \\
+180 & 7.83 & 1.01 & 4.30 & 14.01 & 1084 \\
+250 & 11.23 & 0.86 & 4.68 & 13.32 & 210 \\
+\bottomrule
+\multicolumn{6}{l}{\footnotesize \textsuperscript{a} Median of Absolute Deviation, scaled by a correction factor of 1.4826}
+\end{tabular}
+\end{table}
+
+Annex~\ref{annex:yield} shows complete descriptive statistics for the simulated data. Different water and land management practices as well as different weather scenarios are included in the simulation. Irrigation is applied for N application rates $\geq$ 180 kg N/ha. In the case of monoculture, conventional tillage with different percentages of crop residues left in the field are assumed across 0, 30, 60, and 90 percent. In the case of different crop rotations, conventional tillage with business-as-usual crop residue and minimum tillage with high crop residues are considered. Original dry-matter yield levels are converted to economic yield considering a moisture content of 12\%. Yields for different N levels are generated for the period 1985--2020 based on historical weather. To increase the number of scenarios, we moreover consider simulated yields under future climate scenarios for different emission pathways. More specifically, we consider a low emission (ssp126) and a very high emission scenario (ssp585) for the simulation of yields only for N application rates of 180 kg N/ha. For more information about the EPIC-IIASA model specifications and calibration see \citet{Balkovic2013}.
+
+\subsection{Price data}
+
+We use farm-level fertilizer and wheat prices data obtained from the Chamber of Agriculture of North Rhine-Westphalia. We use Calcium Ammonium Nitrate (CAN) as representative N-fertilizer that is widely applied and for which data is most complete. Prices for CAN are recorded twice a month (1\textsuperscript{st} and 3\textsuperscript{rd} Monday of the month), while the wheat price time series contains weekly observations. We thus only use wheat price observations in weeks for which we have also fertilizer price recordings. The final dataset consists of 401 biweekly observations of CAN and wheat prices from January 2009 to November 2025 (Figure~\ref{fig:prices}). For our analysis we use the first difference as both CAN and wheat time series are not stationary (see Annex~\ref{annex:price} for summary statistics).
+
+\begin{figure}[H]
+\centering
+% \includegraphics[width=\textwidth]{figure_prices.pdf}
+\caption{Calcium Ammonium Nitrate (CAN) and wheat log of prices (\euro/kg; Jan 2009--Nov 2025).}
+\label{fig:prices}
+\end{figure}
+
+% ============================================================
+% 5. RESULTS
+% ============================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Production and yield variation functions}
+
+The estimations of the production and yield variation functions are presented in Table~\ref{tab:prodfunc}. Variables to control for land and water management are included. Coefficient estimates of the production function indicate that N application does not display diminishing marginal productivity (within the observed application range) and might be due to the model simulating only optimal nitrogen application levels. The variation function shows that yield variability (i.e., production risk) increases with higher nitrogen applications.
+
+\begin{table}[H]
+\centering
+\caption{Estimation of production (Eq.~\ref{eq:prodfunc}) and variation (Eq.~\ref{eq:varfunc}) functions}
+\label{tab:prodfunc}
+\begin{tabular}{lcc}
+\toprule
+ & Production function & Variation function \\
+\midrule
+Intercept & $-0.464^{**}$ & 0.087 \\
+ & (0.205) & (0.116) \\
+$N^{0.5}$ & $0.284^{***}$ & $0.081^{***}$ \\
+ & (0.049) & (0.025) \\
+$N$ & $0.026^{***}$ & $-0.003^{**}$ \\
+ & (0.003) & (0.001) \\
+irrigation & $0.118^{*}$ & $-0.053$ \\
+ & (0.069) & (0.039) \\
+til\_min\_cons & $-1.596^{***}$ & $-0.040$ \\
+ & (0.072) & (0.044) \\
+til\_contill\_r00 & $1.013^{***}$ & $-0.243^{***}$ \\
+ & (0.061) & (0.035) \\
+til\_contill\_r30 & $0.632^{***}$ & $-0.042$ \\
+ & (0.093) & (0.051) \\
+til\_contill\_r60 & $0.407^{**}$ & $0.226^{***}$ \\
+ & (0.167) & (0.062) \\
+til\_contill\_r90 & 0.030 & $0.355^{***}$ \\
+ & (0.196) & (0.075) \\
+\midrule
+Num.Obs. & 1609 & 1609 \\
+Adj.R$^2$ & 0.863 & 0.093 \\
+\bottomrule
+\multicolumn{3}{p{12cm}}{\footnotesize Note: til\_min\_cons: dummy indicating minimum tillage with high crop residues left in the field; til\_contill\_r: dummies indicating conventional tillage with different level of crop residues left in the field (0, 30, 60, and 90\%); statistics in parentheses are standard errors; significance at $^{*} = 0.1$, $^{**} = 0.05$, and $^{***} = 0.01$ levels.}
+\end{tabular}
+\end{table}
+
+\subsection{Marginal price distributions}
+
+We use QVAR to estimate the marginal distributions (Eqs.~\ref{eq:margx}--\ref{eq:margy}). To determine the number of lags, we use the Schwarz Bayesian Information Criterion (BIC). As suggested by the BIC, a model of order 1 was selected for parsimony. The QVAR specification allows price dependencies to be different across price quantiles. The estimation is thus carried out for each integer quantile $\tau$ from 1 to 99 \citep{Koenker2005}, with the following specification:
+\begin{equation}
+Q_{\tau}(\Delta p_{i,t} | Z_{t-1}) = \alpha_{i,\tau} + \boldsymbol{\beta}_{i,\tau} Z_{t-1}
+\label{eq:QVAR}
+\end{equation}
+where $\alpha_{i,\tau}$, with $i \in \{x, y\}$, describes the intercept for price $i$ in quantile $\tau$ and $\boldsymbol{\beta}_{i,\tau}$ is a matrix of parameters for the conditional effect of each lag and quantile. We investigate various functional specifications of the QVAR mode by comparing information criteria on the mean regression (VAR). Results of the estimation of the VAR and QVAR for selected quantiles ($\tau = 0.1, 0.3, 0.5, 0.7, 0.9$) are reported in Table~\ref{tab:CAN_QVAR} and Table~\ref{tab:wheat_QVAR}. Standard errors are derived by bootstrapping \citep{KoenkerXiao2006}, and the goodness of fit for the QVAR is calculated following \citet{KoenkerMachado1999}.
+
+\begin{table}[H]
+\centering
+\caption{VAR and QVAR estimates for Calcium Ammonium Nitrate price}
+\label{tab:CAN_QVAR}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+ & VAR & \multicolumn{5}{c}{QVAR} \\
+\cmidrule(lr){3-7}
+Quantiles & & 0.1 & 0.3 & 0.5 & 0.7 & 0.9 \\
+\midrule
+Intercept & $-0.000$ & $-0.096^{***}$ & $-0.026^{***}$ & 0.000 & $0.023^{***}$ & $0.091^{***}$ \\
+ & (0.011) & (0.016) & (0.004) & (0.003) & (0.005) & (0.011) \\
+$\Delta p_{x,t-1}$ & $0.252^{***}$ & $0.362^{***}$ & $0.328^{***}$ & $0.312^{***}$ & $0.303^{***}$ & $0.274^{***}$ \\
+ & (0.047) & (0.089) & (0.050) & (0.030) & (0.053) & (0.026) \\
+$\Delta p_{y,t-1}$ & $0.485^{***}$ & 0.056 & $0.086^{***}$ & $0.056^{***}$ & $0.099^{**}$ & $0.223^{*}$ \\
+ & (0.094) & (0.083) & (0.026) & (0.010) & (0.038) & (0.130) \\
+\midrule
+Num.Obs. & 396 & 396 & 396 & 396 & 396 & 396 \\
+Adj.\ R$^2$ & 0.133 & & & & & \\
+Pseudo R$^2$ & -- & 0.089 & 0.094 & 0.064 & 0.073 & 0.084 \\
+RMSE & 0.21 & 0.24 & 0.22 & 0.22 & 0.22 & 0.23 \\
+\bottomrule
+\multicolumn{7}{p{14cm}}{\footnotesize Note: quantile regression standard errors are calculated by bootstrapping; stars indicate significance at $^{*} = 0.1$, $^{**} = 0.05$, and $^{***} = 0.01$ levels; Pseudo R$^2$ for quantile regression are calculated following \citet{KoenkerMachado1999}.}
+\end{tabular}%
+}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{VAR and QVAR estimates for wheat price}
+\label{tab:wheat_QVAR}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+ & VAR & \multicolumn{5}{c}{QVAR} \\
+\cmidrule(lr){3-7}
+Quantiles & & 0.1 & 0.3 & 0.5 & 0.7 & 0.9 \\
+\midrule
+Intercept & 0.001 & $-0.086^{***}$ & $-0.028^{***}$ & 0.000 & $0.029^{***}$ & $0.094^{***}$ \\
+ & (0.006) & (0.009) & (0.005) & (0.003) & (0.004) & (0.009) \\
+$\Delta p_{y,t-1}$ & $0.075^{***}$ & 0.066 & $0.077^{***}$ & $0.086^{**}$ & $0.050^{**}$ & $0.053^{**}$ \\
+ & (0.025) & (0.056) & (0.018) & (0.038) & (0.024) & (0.026) \\
+$\Delta p_{x,t-1}$ & $-0.119^{**}$ & $-0.037$ & 0.099 & $0.099^{***}$ & 0.037 & $-0.060$ \\
+ & (0.050) & (0.069) & (0.063) & (0.015) & (0.064) & (0.128) \\
+\midrule
+Num.Obs. & 396 & 396 & 396 & 396 & 396 & 396 \\
+Adj.\ R$^2$ & 0.027 & & & & & \\
+Pseudo R$^2$ & & 0.032 & 0.029 & 0.024 & 0.015 & 0.016 \\
+RMSE & 0.11 & 0.14 & 0.12 & 0.12 & 0.12 & 0.15 \\
+\bottomrule
+\multicolumn{7}{p{14cm}}{\footnotesize Note: quantile regression standard errors are calculated by bootstrapping; stars indicate significance at $^{*} = 0.1$, $^{**} = 0.05$, and $^{***} = 0.01$ levels; Pseudo R$^2$ for quantile regression are calculated following \citet{KoenkerMachado1999}.}
+\end{tabular}%
+}
+\end{table}
+
+Results indicate that price changes for CAN are correlated to the lag of own price changes and mostly correlated to the lag of wheat price changes, but more around the central quantiles. Price changes for wheat are correlated to own lagged price changes only at the median, while correlation to lagged changes in CAN show more statistical significance. The pseudo R$^2$ calculated for the QVAR indicate a low goodness of fit for both CAN and wheat prices, showing that little variation in price changes are explained in the model. In general, effects vary across quantile showing stronger effects in the median regression, dissipating in the tails.
+
+\subsection{Joint price distribution}
+
+The estimations of the marginal distribution are used to evaluate the joint distribution. We estimate $F_x$ and $F_y$ by first deriving the quantiles that provide the best fit for the estimation. The obtained quantile distributions are used to estimate the copula connecting the marginal distributions. The copula $C$ indicates the contemporaneous co-dependence between the marginal distributions and is estimated using a quantile regression on the inverse marginal distributions using a conditional distribution function $C_\tau$ of the form:
+\begin{equation}
+Q_\tau(F_y | F_x, Z_{t-1}) = \alpha_\tau + \beta_\tau F_x
+\label{eq:copula_est}
+\end{equation}
+
+\begin{table}[H]
+\centering
+\caption{Quantile estimation of conditional copula}
+\label{tab:copula}
+\begin{tabular}{lccccc}
+\toprule
+Quantiles & 0.1 & 0.3 & 0.5 & 0.7 & 0.9 \\
+\midrule
+Intercept & 0.036 & $0.224^{***}$ & $0.520^{***}$ & $0.690^{***}$ & $0.868^{***}$ \\
+ & (0.024) & (0.042) & (0.063) & (0.044) & (0.037) \\
+$F_x$ & $0.148^{***}$ & $0.129^{**}$ & $-0.034$ & 0.000 & 0.053 \\
+ & (0.054) & (0.073) & (0.093) & (0.078) & (0.075) \\
+\bottomrule
+\multicolumn{6}{p{12cm}}{\footnotesize Note: $F_y$ and $F_x$ denote the quantile distribution of wheat and CAN. Standard Errors in parenthesis are calculated by bootstrapping; stars indicate significance at $^{*} = 0.1$, $^{**} = 0.05$, and $^{***} = 0.01$ levels.}
+\end{tabular}
+\end{table}
+
+Results displayed in Table~\ref{tab:copula} show significant positive coefficients in the lower quantiles (0.1 and 0.3), indicating a positive contemporaneous codependence of CAN and wheat price changes. For the median and higher quantiles, we find no evidence against independence.
+
+\subsection{Contract pricing}
+
+We simulate 1,000 price paths of 24 time periods (1 year). Simulations for CAN and wheat prices based on the estimated models (see also Fig.~A1 for density distributions) are used for the contract pricing and profits calculations. Results from the burn analysis are presented in Table~\ref{tab:contract_pricing}. We select the strike prices based on distribution quantiles of simulated CAN prices. Diminishing premiums at higher strike prices reflecting lower probability of exercise and expected payoff. Figure~\ref{fig:density} reports the price density distribution of CAN under the contract conditions across different strike prices comparing them to the simulated CAN prices.
+
+\begin{table}[H]
+\centering
+\caption{Contract pricing by burn analysis at different strike prices}
+\label{tab:contract_pricing}
+\begin{tabular}{lcc}
+\toprule
+Quantile & Strike price (\euro/kg) & Premium (\euro/kg) \\
+\midrule
+0.5 & 0.355 & 0.011 \\
+0.6 & 0.361 & 0.009 \\
+0.7 & 0.366 & 0.007 \\
+0.8 & 0.375 & 0.004 \\
+0.9 & 0.389 & 0.002 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+% \includegraphics[width=\textwidth]{figure_density.pdf}
+\caption{Price density distributions of simulated CAN prices and CAN prices paid with the contract at different strike levels}
+\label{fig:density}
+\end{figure}
+
+\subsection{Profits and utility levels}
+
+Based on our decision framework, we assume that the decision-maker can adopt a forward contract at the start of the season, thus fixing the CAN price, or adopt the adjusted contract with different price caps. Alternatively, CAN is bought in early march at market price (no contract). Simulated profits for the different strategies are calculated under broad and narrow framings (see Annex~\ref{annex:profits} for summary statistics). Final utility and prospect values are displayed in Table~\ref{tab:EUT_broad} and Table~\ref{tab:CPT_broad} for EUT and CPT preferences under broad framing, and in Table~\ref{tab:EUT_narrow} and Table~\ref{tab:CPT_narrow} under narrow framing. EUT results are reported as Certainty Equivalents (CE) in Euro/ha across different values of absolute risk aversion $r$. CPT results are reported as final prospect values $V$. Alternative parameter levels for risk aversion $\alpha$, loss aversion $\lambda$ and probability decision weights $\gamma$ are included. The choice of the reference point is different for broad and narrow framing. When the contract is considered as a risk management tool, we adopt expected outcome as a reference point. When it is considered as a stand-alone investment, the reference point is zero.
+
+Under broad framing, the producer evaluates each contract in the context of the entire farm profits. Results for the EUT framework suggest that across all levels of risk aversion (except for extremely risk averse levels), the adjusted contract delivers the highest CE, indicating the viability of this strategy when framed as a risk management tool. In general, however, the differences in CEs are small across the different strategies. Interestingly, the forward contract yields the lowest CE across all the $r$ values, indicating that, under broad framing, this would be the least preferred strategy. This is explained by the fact that by fixing input prices, the producer is losing the natural price hedge (i.e.\ given the correlation between fertilizers and wheat prices, when prices are high farmers get higher output prices and pay higher input prices, the contrary happens when prices are low). This causes total profits to fluctuate more strongly.
+
+Results for the broad framing using a CPT framework display negative values for all the strategies, meaning that the prospects are perceived as a loss relative to the expected profits under the forward contract. This is consistent across alternative parametrization with the only exception for the atypical case of loss-seeking behavior $\lambda < 1$. This suggests that the adjusted contract is not attractive to farmers when considering CPT preferences, in contrast to EUT results.
+
+When the contracts are narrowly framed as risky investments, producers consider only the contract's payoff and cost, with the reference point becoming zero. Here, since it is framed as an investment decision, the ``no contract'' strategy is not analyzed. Results for the EUT framework indicate that forward pricing yield the highest CE values across the different risk aversion levels. This result stands in direct contrast to the broad framing scenario. Under narrow framing, profit variability is driven solely by fertilizer price risk. In contrast, under broad framing, the correlation between fertilizer and wheat prices makes the adoption of a price-fixing strategy unattractive to farmers, as it eliminates the natural price hedge. Consequently, while forward contracts are disfavored under broad framing, they are preferred under narrow framing. Similar to the broad framing case, results for the CPT framework display negative values. Overall, both EUT and CPT results under narrow framing suggest that the adjusted contract is not a viable option and might face low adoption.
+
+\begin{table}[H]
+\centering
+\caption{Certainty Equivalents (CE) for different level of absolute risk aversion $r$ under broad framing.}
+\label{tab:EUT_broad}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccccc}
+\toprule
+ & & No contract & Forward & \multicolumn{5}{c}{Adjusted contract} \\
+\cmidrule(lr){5-9}
+$r$ & Strike level & & contract & 0.355 & 0.361 & 0.368 & 0.376 & 0.388 \\
+\midrule
+0.00001 & & 1162.43 & 1160.01 & 1162.31 & 1162.57 & \textbf{1162.95} & 1162.21 & 1162.41 \\
+0.00005 & & 1160.47 & 1157.96 & 1160.29 & 1160.56 & \textbf{1160.95} & 1160.22 & 1160.43 \\
+0.0001 & & 1158.02 & 1155.38 & 1157.77 & 1158.05 & \textbf{1158.45} & 1157.73 & 1157.95 \\
+0.0005 & & 1138.43 & 1134.79 & 1137.57 & 1137.94 & \textbf{1138.44} & 1137.80 & 1138.14 \\
+0.001 & & 1113.95 & 1109.05 & 1112.32 & 1112.81 & \textbf{1113.42} & 1112.90 & 1113.37 \\
+\bottomrule
+\multicolumn{9}{l}{\footnotesize Note: CE in Euro/ha; the highest CE for each level of risk aversion is highlighted in bold.}
+\end{tabular}%
+}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{CPT results under broad framing}
+\label{tab:CPT_broad}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{cccccccc}
+\toprule
+ & No contract & Forward & \multicolumn{5}{c}{Adjusted contract} \\
+\cmidrule(lr){4-8}
+Strike level & & contract & 0.355 & 0.361 & 0.368 & 0.376 & 0.388 \\
+\midrule
+$V$ & $-2.43$ & $-2.48$ & $-2.44$ & $-2.42$ & $-2.44$ & $-2.46$ & $-2.45$ \\
+$V(\alpha)$ & $-0.47$ & $-0.48$ & $-0.48$ & $-0.48$ & $-0.48$ & $-0.48$ & $-0.48$ \\
+$V(\lambda)$ & $-7.18$ & $-7.37$ & $-7.21$ & $-7.16$ & $-7.19$ & $-7.23$ & $-7.23$ \\
+$V(\lambda<1)$ & 0.93 & 0.92 & 0.93 & 0.95 & 0.93 & 0.91 & 0.91 \\
+$V(\gamma_{TK})$ & $-3.76$ & $-3.83$ & $-3.78$ & $-3.76$ & $-3.78$ & $-3.79$ & $-3.79$ \\
+$V(\gamma_{Prelec})$ & $-2.86$ & $-2.92$ & $-2.89$ & $-2.86$ & $-2.89$ & $-2.91$ & $-2.91$ \\
+$V(\gamma=1)$ & $-2.25$ & $-2.30$ & $-2.26$ & $-2.25$ & $-2.26$ & $-2.27$ & $-2.27$ \\
+\bottomrule
+\multicolumn{8}{l}{\footnotesize Note: the assumed reference point is the forward contract expected outcome.}
+\end{tabular}%
+}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Certainty Equivalents (CE) for different level of absolute risk aversion $r$ under narrow framing.}
+\label{tab:EUT_narrow}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccccccc}
+\toprule
+ & & Forward & \multicolumn{5}{c}{Adjusted contract} \\
+\cmidrule(lr){4-8}
+$r$ & Strike level & contract & 0.355 & 0.361 & 0.368 & 0.376 & 0.388 \\
+\midrule
+0.00001 & & \textbf{2.39} & $-0.1$ & 0.15 & 0.53 & $-0.21$ & $-0.02$ \\
+0.00005 & & \textbf{2.38} & $-0.11$ & 0.15 & 0.53 & $-0.21$ & $-0.02$ \\
+0.0001 & & \textbf{2.37} & $-0.11$ & 0.15 & 0.53 & $-0.22$ & $-0.02$ \\
+0.0005 & & \textbf{2.29} & $-0.15$ & 0.12 & 0.51 & $-0.23$ & $-0.03$ \\
+0.001 & & \textbf{2.18} & $-0.19$ & 0.08 & 0.48 & $-0.25$ & $-0.04$ \\
+\bottomrule
+\multicolumn{8}{l}{\footnotesize Note: CE in Euro/ha; the highest CE for each level of risk aversion is highlighted in bold.}
+\end{tabular}%
+}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{CPT results under narrow framing}
+\label{tab:CPT_narrow}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{ccccccc}
+\toprule
+ & Forward & \multicolumn{5}{c}{Adjusted contract} \\
+\cmidrule(lr){3-7}
+Strike level & contract & 0.355 & 0.361 & 0.368 & 0.376 & 0.388 \\
+\midrule
+$V$ & $-0.74$ & $-0.88$ & $-0.90$ & $-0.85$ & $-1.03$ & $-0.99$ \\
+$V(\alpha)$ & $-0.15$ & $-0.53$ & $-0.60$ & $-0.69$ & $-0.86$ & $-1.01$ \\
+$V(\lambda)$ & $-1.72$ & $-1.21$ & $-1.13$ & $-0.93$ & $-1.11$ & $-0.91$ \\
+$V(\lambda<1)$ & 0.52 & 0.26 & 0.19 & 0.16 & 0.03 & $-0.05$ \\
+$V(\gamma_{TK})$ & $-1.24$ & $-1.33$ & $-1.33$ & $-1.25$ & $-1.45$ & $-1.37$ \\
+$V(\gamma_{Prelec})$ & $-1.15$ & $-0.79$ & $-0.79$ & $-0.68$ & $-0.81$ & $-0.76$ \\
+$V(\gamma=1)$ & $-0.51$ & $-0.98$ & $-1.01$ & $-0.99$ & $-1.20$ & $-1.15$ \\
+\bottomrule
+\multicolumn{7}{l}{\footnotesize Note: the assumed reference point is zero.}
+\end{tabular}%
+}
+\end{table}
+
+% ============================================================
+% 6. DISCUSSION
+% ============================================================
+\section{Discussion}
+\label{sec:discussion}
+
+Our results highlight meaningful differences in how producers evaluate input price risk-management tools, particularly when considered through the different lenses of broad and narrow framing. Under broad framing, the contract is assessed jointly with production performance leading to choices that reflect improvements in the overall riskiness of profits. In contrast, narrow framing focuses on the contract in isolation, considering only its standalone payoff and cost structure. The observed variation in results outcomes suggests that producers' contract decisions depend not only on the underlying decision theory but also on the cognitive frame through which the decision is made, as suggested by findings on crop insurance \citep{Babcock2015, Dalhaus2020}. Except for limited evidence of EUT values under broad framing, the results suggests that, under both framings, the adjusted contract leads to no meaningful improvement for input price risk due to the negligible effect of input price risk on overall risk. A more holistic approach that considers both input and output price risk might be better suited.
+
+The results from the Quantile Vector Autoregression (QVAR) combined with a copula allowed us to investigate the structure of the multivariate distribution of Calcium Ammonium Nitrate (CAN) and wheat prices. We find positive correlations between price changes and changes in their own and cross lagged changes, especially around median prices, with the correlation fading for lower and higher quantiles of the price distribution. This approach allowed us to consider the tail-dependency of the two prices on each other in the forecast model. Nonetheless, simulated prices for CAN present a shifted price distribution (see figure in Annex~\ref{annex:price}), implying that our forecasted prices present higher average values than the observed empirical distribution. This might bias our quantitative results, but since we base both the contract pricing and the profit calculation on forecasted prices, the qualitative interpretation does not lose validity.
+
+The stochastic simulation incorporates also production risk through the estimation of a stochastic production function. We use data from the EPIC-IIASA crop model that simulates yield levels for specific spatial coordinates, that allows the site-specific modelling employed here. However, a drawback of the data we use is that the crop model underestimate average winter wheat yields and their standard deviation \citep{Balkovic2013}. This implies that we might underestimate total profits and production risk in the broad framing calculations. It is also important to note that yields are not simulated at very high level of nitrogen application rates. This implies that our stochastic production function estimation does not capture diminishing marginal productivity of fertilizers. Nonetheless, we assume that our representative farm applies an optimal N fertilizer level, mitigating the implication of the biased estimation. We are also aware that, while we are able to model price dependencies, we do not capture in our model wheat yield and wheat price correlation (i.e., the level of ``natural hedge''), which is unlikely for the model region.
+
+Lastly, a note on our modelling approach, decision theories models, and parameters specifications is needed. First, we restricted our analysis on a single agricultural activity (winter wheat production) and assumed no other costs besides input prices. This simplification was employed for analysis purposes but might not reflect the complexity of real-world farming activities. In addition, strategies to reduce dependency on nitrogen fertilizers and fertilizers saving technologies, can also have the dual benefit of reducing input price risk and environmental impact \citep{Krein2023}.
+
+The EUT preferences are evaluated using the Mean-Variance approximation (Eq.~\ref{eq:CE}). This model has been widely used in the literature for its simplicity and easy interpretation, especially for hedging decisions \citep{Spada2025}. Nonetheless, this approach has been criticized as imposes restrictive behavioral assumptions such as the independence to wealth levels, and the reliance on only the first two moments of the outcome distribution. Moreover, the selected coefficients may not fully cover the range of farmers' attitudes, affecting in turn the interpretation of our results. Thus, while this framework facilitates the tractability, it may not fully capture the heterogeneity and wealth-dependent nature of actual farmers' behavior.
+
+A similar argument can be made for CPT preferences. First, final prospect values heavily depend on our model specification and reference points. Further, heterogeneity and instability of the parameters can also affect results \citep{Finger2024}. The parameters employed in the analysis have been taken from empirical evidence on German farmers \citep{Rommel2023}. Robustness to alternative parametrization has been explored, indicating similar results. Although is worth noting that our point estimates might not reflect well the heterogeneity in elicited parameter that farmers display. In addition, externally imposed reference points have been frequently criticized \citep{KoszegiRabin2006, KoszegiRabin2007}. Producer reference points are unobservable, they can be highly heterogeneous among farmers and shift in time. Consequently, the results must be interpreted with caution given the sensitivity to the selected parameters and reference points.
+
+% ============================================================
+% 7. CONCLUSIONS
+% ============================================================
+\section{Conclusions}
+\label{sec:conclusions}
+
+In summary, we propose a maximum-price adjustment to a forward contract for input price risk management. This adjustment can better align to producers' actual behavioral preferences, thus making it more attractive to farmers. We estimate both production risk, using a stochastic production function, and price risk, by providing evidence on the quantile correlation between fertilizer and wheat prices. We use the estimated risks in a Monte Carlo simulation to assess the feasibility of the introduction of the adjusted forward contract for input price risk management. This approach enables us to simulate price and production risk for utility levels calculations under different decision theories and framing scenarios.
+
+We evaluate the adjusted contracts using Mean-Variance values under Expected Utility Theory and prospect values under Cumulative Prospect Theory. We also evaluate the outcomes under different decision framing: producers might frame the adoption of the contract in the context of a whole farm decision, considering it as a risk management tool (broad framing); alternatively, producers might narrowly frame the adoption as a standalone investment decision, considering it, in fact, as an investment. Results from the Monte Carlo simulation, that incorporates both production and price risk, indicate that the contract delivers limited utility gains for farmers under broad framing, and that is not attractive when considered under narrow framing, suggesting that its real-word attractiveness may be low and that adoption could be limited if the contract were introduced.
+
+% ============================================================
+% REFERENCES
+% ============================================================
+\newpage
+\section*{References}
+\addcontentsline{toc}{section}{References}
+
+\begin{description}
+
+\item Babcock, B. A. (2015). Using cumulative prospect theory to explain anomalous crop insurance coverage choice. \textit{American Journal of Agricultural Economics}, 97(5), 1371--1384. \url{https://doi.org/10.1093/ajae/aav032}
+
+\item Balkovi\v{c}, J., van der Velde, M., Schmid, E., Skalsk\'{y}, R., Khabarov, N., Obersteiner, M., St\"{u}rmer, B., \& Xiong, W. (2013). Pan-European crop modelling with EPIC: Implementation, up-scaling and regional crop yield validation. \textit{Agricultural Systems}, 120, 61--75. \url{https://doi.org/10.1016/j.agsy.2013.05.008}
+
+\item Barberis, N., Huang, M., \& Thaler, R. H. (2006). Individual Preferences, Monetary Gambles, and Stock Market Participation: A Case for Narrow Framing. \textit{American Economic Review}, 96(4), 1069--1090. \url{https://doi.org/10.1257/aer.96.4.1069}
+
+\item Bougherara, D., Gassmann, X., Piet, L., \& Reynaud, A. (2017). Structural estimation of farmers' risk and ambiguity preferences: A field experiment. \textit{European Review of Agricultural Economics}, 44(5), 782--808. \url{https://doi.org/10.1093/erae/jbx011}
+
+\item Dalhaus, T., Barnett, B. J., \& Finger, R. (2020). Behavioral weather insurance: Applying cumulative prospect theory to agricultural insurance design under narrow framing. \textit{PLOS ONE}, 15(5), e0232267. \url{https://doi.org/10.1371/journal.pone.0232267}
+
+\item Dong, F., Beckman, J., \& Arita, S. (2025). Unraveling demand and supply shocks in the U.S. nitrogen market. \textit{Applied Economic Perspectives and Policy}, n/a(n/a). \url{https://doi.org/10.1002/aepp.70004}
+
+\item European Commission. (2022). Food security: The Commission addresses the availability and affordability of fertilisers in the EU and globally [Press release]. \url{https://ec.europa.eu/commission/presscorner/detail/en/ip_22_6564}
+
+\item FAO. (2024). Inorganic fertilizers---2002--2022 (FAOSTAT Analytical Brief No. 90). \url{https://doi.org/10.4060/cd1485en}
+
+\item Finger, R. (2012). Nitrogen use and the effects of nitrogen taxation under consideration of production and price risks. \textit{Agricultural Systems}, 107, 13--20. \url{https://doi.org/10.1016/j.agsy.2011.12.001}
+
+\item Finger, R. (2013). Investigating the performance of different estimation techniques for crop yield data analysis in crop insurance applications. \textit{Agricultural Economics}, 44(2), 217--230. \url{https://doi.org/10.1111/agec.12005}
+
+\item Finger, R., Garcia, V., McCallum, C., \& Rommel, J. (2024). A note on European farmers' preferences under cumulative prospect theory. \textit{Journal of Agricultural Economics}, 75(1), 465--472. \url{https://doi.org/10.1111/1477-9552.12565}
+
+\item Finger, R., \& Hediger, W. (2008). The Application of Robust Regression to a Production Function Comparison. \textit{The Open Agriculture Journal}, 2(1). \url{https://doi.org/10.2174/1874331500802010090}
+
+\item Finger, R., \& Schmid, S. (2008). Modeling agricultural production risk and the adaptation to climate change. \textit{Agricultural Finance Review}, 68(1), 25--41. \url{https://doi.org/10.1108/00214660880001217}
+
+\item Hardaker, J. B., Huirne, R. B. M., Anderson, J. R., \& Lien, G. (2015). \textit{Coping With Risk in Agriculture} (3rd ed.). CABI Publishing. \url{https://www.cabidigitallibrary.org/doi/book/10.1079/9781780645742.0000}
+
+\item Hern\'{a}ndez-Ochoa, I. M., Gaiser, T., H\"{u}ging, H., \& Ewert, F. (2023). Yield components and yield quality of old and modern wheat cultivars as affected by cultivar release date, N fertilization and environment in Germany. \textit{Field Crops Research}, 302, 109094. \url{https://doi.org/10.1016/j.fcr.2023.109094}
+
+\item IFA. (2022). Fertilizer use by crop and country for the 2017--2018 period. International Fertilizer Association (IFA).
+
+\item Just, R. E., \& Pope, R. D. (1978). Stochastic specification of production functions and economic implications. \textit{Journal of Econometrics}, 7(1), 67--86. \url{https://doi.org/10.1016/0304-4076(78)90006-4}
+
+\item Just, R. E., \& Pope, R. D. (1979). Production Function Estimation and Related Risk Considerations. \textit{American Journal of Agricultural Economics}, 61(2), 276--284. \url{https://doi.org/10.2307/1239732}
+
+\item Knight, F. H. (1921). \textit{Risk, uncertainty and profit} (Vol. 31). Houghton Mifflin.
+
+\item Koenker, R. (2005). \textit{Quantile Regression}. Cambridge University Press. \url{https://doi.org/10.1017/CBO9780511754098}
+
+\item Koenker, R., \& Machado, J. A. F. (1999). Goodness of Fit and Related Inference Processes for Quantile Regression. \textit{Journal of the American Statistical Association}, 94(448), 1296--1310. \url{https://doi.org/10.1080/01621459.1999.10473882}
+
+\item Koenker, R., \& Xiao, Z. (2006). Quantile Autoregression. \textit{Journal of the American Statistical Association}, 101(475), 980--990. \url{https://doi.org/10.1198/016214506000000672}
+
+\item K\H{o}szegi, B., \& Rabin, M. (2006). A Model of Reference-Dependent Preferences. \textit{The Quarterly Journal of Economics}, 121(4), 1133--1165. \url{https://doi.org/10.1093/qje/121.4.1133}
+
+\item K\H{o}szegi, B., \& Rabin, M. (2007). Reference-Dependent Risk Attitudes. \textit{American Economic Review}, 97(4), 1047--1073. \url{https://doi.org/10.1257/aer.97.4.1047}
+
+\item Krein, D. D. C., Rosseto, M., Cemin, F., Massuda, L. A., \& Dettmer, A. (2023). Recent trends and technologies for reduced environmental impacts of fertilizers: A review. \textit{International Journal of Environmental Science and Technology}, 20(11), 12903--12918. \url{https://doi.org/10.1007/s13762-023-04929-2}
+
+\item Li, J., \& Chavas, J. P. (2023). A dynamic analysis of the distribution of commodity futures and spot prices. \textit{American Journal of Agricultural Economics}, 105(1), 122--143. \url{https://doi.org/10.1111/ajae.12309}
+
+\item Mattos, F., Garcia, P., \& Pennings, J. M. E. (2008). Probability weighting and loss aversion in futures hedging. \textit{Journal of Financial Markets}, 11(4), 433--452. \url{https://doi.org/10.1016/j.finmar.2008.04.002}
+
+\item Nelsen. (2006). \textit{An Introduction to Copulas}. Springer. \url{https://doi.org/10.1007/0-387-28678-0}
+
+\item O'Neill, B. C., Kriegler, E., Riahi, K., Ebi, K. L., Hallegatte, S., Carter, T. R., Mathur, R., \& van Vuuren, D. P. (2014). A new scenario framework for climate change research: The concept of shared socioeconomic pathways. \textit{Climatic Change}, 122(3), 387--400. \url{https://doi.org/10.1007/s10584-013-0905-2}
+
+\item Prelec, D. (1998). The Probability Weighting Function. \textit{Econometrica}, 66(3), 497--527. \url{https://doi.org/10.2307/2998573}
+
+\item Rommel, J., Sagebiel, J., Baaken, M. C., et al. (2023). Farmers' risk preferences in 11 European farming systems: A multi-country replication of Bocqu\'{e}ho et al. \textit{Applied Economic Perspectives and Policy}, 45(3), 1374--1399. \url{https://doi.org/10.1002/aepp.13330}
+
+\item Sklar, M. (1959). \textit{Fonctions de R\'{e}partition \`{A} N Dimensions Et Leurs Marges}. Universit\'{e} Paris 8.
+
+\item Spada, R., Moritz, L., Rommel, J., Cerroni, S., Meuwissen, M. P. M., \& Dalhaus, T. (2025). Behavioral Preferences Affecting the Adoption of Financial Price Risk Management Tools in Agriculture: A Systematic Literature Review. \url{https://doi.org/10.22004/ag.econ.356632}
+
+\item Tversky, A., \& Kahneman, D. (1981). The Framing of Decisions and the Psychology of Choice. \textit{Science}, 211(4481), 453--458. \url{https://doi.org/10.1126/science.7455683}
+
+\item Tversky, A., \& Kahneman, D. (1992). Advances in prospect theory: Cumulative representation of uncertainty. \textit{Journal of Risk and Uncertainty}, 5(4), 297--323. \url{https://doi.org/10.1007/BF00122574}
+
+\item Yohai, V. J. (1987). High Breakdown-Point and High Efficiency Robust Estimates for Regression. \textit{The Annals of Statistics}, 15(2), 642--656. \url{https://doi.org/10.1214/aos/1176350366}
+
+\end{description}
+
+% ============================================================
+% ANNEXES
+% ============================================================
+\newpage
+\appendix
+
+\section{Descriptive statistics for simulated yield data}
+\label{annex:yield}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{lrrrrr}
+\toprule
+Variable & mean & sd & min & max \\
+\midrule
+N (kg/ha) & 167.17 & 55.97 & 10 & 250 \\
+yield (t/ha) & 7.39 & 2.25 & 1.16 & 14.01 \\
+historical weather & 0.53 & -- & 0 & 1 \\
+cmip6\_ipsl\_ssp126 & 0.12 & -- & 0 & 1 \\
+cmip6\_ipsl\_ssp585 & 0.12 & -- & 0 & 1 \\
+cmip6\_mpi\_ssp126 & 0.12 & -- & 0 & 1 \\
+cmip6\_mpi\_ssp585 & 0.12 & -- & 0 & 1 \\
+rainfed & 0.86 & -- & 0 & 1 \\
+irrigated & 0.14 & -- & 0 & 1 \\
+rot\_mono & 0.33 & -- & 0 & 1 \\
+rot\_1 & 0.15 & -- & 0 & 1 \\
+rot\_2 & 0.07 & -- & 0 & 1 \\
+rot\_3 & 0.07 & -- & 0 & 1 \\
+rot\_4 & 0.15 & -- & 0 & 1 \\
+rot\_6 & 0.08 & -- & 0 & 1 \\
+rot\_7 & 0.15 & -- & 0 & 1 \\
+til\_bau & 0.57 & -- & 0 & 1 \\
+til\_min\_cons & 0.1 & -- & 0 & 1 \\
+til\_contill\_r00 & 0.11 & -- & 0 & 1 \\
+til\_contill\_r30 & 0.07 & -- & 0 & 1 \\
+til\_contill\_r60 & 0.09 & -- & 0 & 1 \\
+til\_contill\_r90 & 0.07 & -- & 0 & 1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\footnotesize
+Note: outputs from different climate models based on phase 6 of the Coupled Model Intercomparison Project (cmip6) from the Institut Pierre-Simone Laplace (ipsl) and Max Planck Institute for Meteorology (mpi) are considered under different Shared Socioeconomic Pathways (ssp); ssp126 is a low-emission scenario; ssp585 is a very high emission scenario \citep{ONeill2014}. Irrigation is assumed only for N application rates $\geq$ 180 kgN/ha; in the case of a monoculture cropping system (rot\_mono), conventional tillage with different percentages of crop residue are assumed (til\_contill\_r) across 0, 30, 60, and 90 percent; in the case of different crop rotations (rot\_1--7), conventional tillage with business-as-usual crop residue (til\_bau) and minimum tillage with high crop residues (til\_min\_cons) are considered; yield levels are obtained converting dry-matter yields considering a water content of 12\%; for more information about the EPIC-IIASA model specifications and calibration see \citet{Balkovic2013}.
+\normalsize
+
+\newpage
+\section{Summary statistics and density distributions of price data}
+\label{annex:price}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+Statistic & log\_CAN & log\_Wheat & dif\_CAN & dif\_Wheat \\
+\midrule
+Mean & 3.06 & 1.82 & 0 & 0 \\
+SD & 1.44 & 0.51 & 0.23 & 0.12 \\
+Min & 1.62 & 0.94 & $-0.92$ & $-1.04$ \\
+Max & 9.29 & 3.8 & 3.03 & 1.08 \\
+Skew & 2.52 & 1.25 & 6.75 & 1.15 \\
+Kurtosis & 9.3 & 5.51 & 89.6 & 44.23 \\
+ADF test & $-2.47$ & $-2.73$ & $-8.47^{*}$ & $-9.05^{*}$ \\
+KPSS test & $1.45^{*}$ & $1.42^{*}$ & 0.07 & 0.08 \\
+PP test & $-11.19$ & $-12.8$ & $-295.74^{*}$ & $-474.91^{*}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\footnotesize
+Note: statistics rounded to the second decimal of Calcium Ammonium Nitrate (CAN) and wheat prices (Eur/kg); $^{*}$ indicates the rejection of the null hypothesis at the 5\% level for the Augmented Dickey-Fuller (ADF) test, the Kwiatkowski-Phillips-Schmidt-Shin (KPSS), and the Phillips-Perron (PP) test.
+\normalsize
+
+\begin{figure}[H]
+\centering
+% \includegraphics[width=\textwidth]{figure_density_annex.pdf}
+\caption{Density distributions of simulated and deflated CAN and wheat prices}
+\end{figure}
+
+\newpage
+\section{Summary statistics of simulated CAN prices, costs, and profits}
+\label{annex:profits}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcrrrrr}
+\toprule
+ & & Strike & Mean & Median & SD & Min & Max \\
+\midrule
+\multirow{7}{*}{CAN price paid} & No contract & -- & 0.356 & 0.355 & 0.028 & 0.279 & 0.523 \\
+ & Forward contract & -- & 0.359 & 0.359 & 0 & 0.359 & 0.359 \\
+ & Adjusted contract & 0.355 & 0.345 & 0.355 & 0.015 & 0.279 & 0.355 \\
+ & & 0.361 & 0.348 & 0.355 & 0.017 & 0.279 & 0.361 \\
+ & & 0.368 & 0.350 & 0.355 & 0.019 & 0.279 & 0.368 \\
+ & & 0.376 & 0.352 & 0.355 & 0.021 & 0.279 & 0.376 \\
+ & & 0.388 & 0.354 & 0.355 & 0.023 & 0.279 & 0.388 \\
+\midrule
+\multirow{7}{*}{Costs} & No contract & -- & 263.65 & 262.82 & 20.47 & 206.54 & 387.11 \\
+ & Forward contract & -- & 266.04 & 266.04 & 0 & 266.04 & 266.04 \\
+ & Adjusted contract & 0.355 & 263.75 & 270.97 & 11.20 & 214.68 & 271.11 \\
+ & & 0.361 & 263.49 & 268.75 & 12.60 & 212.46 & 273.33 \\
+ & & 0.368 & 263.12 & 266.52 & 14.18 & 210.24 & 276.29 \\
+ & & 0.376 & 263.86 & 265.78 & 15.69 & 209.50 & 281.48 \\
+ & & 0.388 & 263.66 & 264.30 & 17.32 & 208.02 & 288.89 \\
+\midrule
+\multirow{7}{*}{\shortstack[l]{Profits\\broad framing}} & No contract & -- & 1162.92 & 1122.59 & 312.96 & 279.36 & 2316.85 \\
+ & Forward contract & -- & 1160.53 & 1120.58 & 320.86 & 262.26 & 2395.28 \\
+ & Adjusted contract & 0.355 & 1162.82 & 1123.57 & 317.80 & 271.21 & 2390.21 \\
+ & & 0.361 & 1163.07 & 1121.78 & 317.08 & 273.44 & 2387.99 \\
+ & & 0.368 & 1163.45 & 1121.99 & 316.33 & 275.66 & 2385.02 \\
+ & & 0.376 & 1162.71 & 1120.81 & 315.62 & 276.40 & 2379.84 \\
+ & & 0.388 & 1162.90 & 1121.86 & 314.76 & 277.88 & 2372.43 \\
+\midrule
+\multirow{7}{*}{\shortstack[l]{Profits\\narrow framing}} & No contract & -- & -- & -- & -- & -- & -- \\
+ & Forward contract & -- & 2.39 & 3.22 & 20.47 & $-121.07$ & 59.50 \\
+ & Adjusted contract & 0.355 & $-0.10$ & $-8.15$ & 13.23 & $-8.15$ & 115.99 \\
+ & & 0.361 & 0.15 & $-5.93$ & 11.85 & $-5.93$ & 113.77 \\
+ & & 0.368 & 0.53 & $-3.70$ & 10.31 & $-3.70$ & 110.81 \\
+ & & 0.376 & $-0.21$ & $-2.96$ & 8.71 & $-2.96$ & 105.62 \\
+ & & 0.388 & $-0.02$ & $-1.48$ & 6.71 & $-1.48$ & 98.22 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\end{document}
