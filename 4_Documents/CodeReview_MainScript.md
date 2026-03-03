@@ -99,19 +99,57 @@ The script implements a six-section analytical pipeline:
 ## 4. Priority Summary
 
 ### Critical (verify correctness)
-- **#7/#8**: QVAR coefficient-matrix column order — may be producing incorrect price simulations
-- **#12**: Copula is estimated but never used in simulation; single quantile draw imposes perfect correlation
-- **#22**: CPT decision weight computation may not follow standard formulation for gains
+- ~~**#7/#8**: QVAR coefficient-matrix column order — may be producing incorrect price simulations~~ **RESOLVED 2026-03-03**
+- ~~**#12**: Copula is estimated but never used in simulation; single quantile draw imposes perfect correlation~~ **RESOLVED 2026-03-03**
+- ~~**#22**: CPT decision weight computation may not follow standard formulation for gains~~ **RESOLVED 2026-03-03**
 
 ### Important (affects results interpretation)
-- **#5**: Yield function omits weather/rotation controls despite creating dummies
-- **#16**: M-V approximation for EUT may not hold for skewed profit distributions
-- **#19**: Reference point choice in broad framing needs theoretical justification
+- ~~**#5**: Yield function omits weather/rotation controls despite creating dummies~~ **DOCUMENTED 2026-03-03** (excluded due to collinearity)
+- ~~**#16**: M-V approximation for EUT may not hold for skewed profit distributions~~ **DOCUMENTED 2026-03-03**
+- ~~**#19**: Reference point choice in broad framing needs theoretical justification~~ **DOCUMENTED 2026-03-03**
 
 ### Improvement (code quality / maintainability)
-- **#26/#27**: Extract duplicate CPT/EUT code into functions
-- **#24**: Toggle output writing with a flag
-- **#25**: Avoid shadowing `c()`
+- ~~**#26/#27**: Extract duplicate CPT/EUT code into functions~~ **RESOLVED 2026-03-03**
+- ~~**#24**: Toggle output writing with a flag~~ **RESOLVED 2026-03-03**
+- ~~**#25**: Avoid shadowing `c()`~~ **RESOLVED 2026-03-03**
+
+### Still open
+- ~~**#1**: Hardcoded grid location~~ **DOCUMENTED 2026-03-03** (SimUID 52338 is the location of interest)
+- **#2**: Irregular time intervals not handled (medium)
+- **#3**: PPI 2025 duplicated from last year (low)
+- **#9**: VAR serial correlation / ARCH effects (medium)
+- **#10**: Linear copula model (low)
+- **#13**: Starting price is last observed value (medium, in TODO)
+- ~~**#14**: Simulation horizon mismatch in docs~~ **RESOLVED 2026-03-03** (CLAUDE.md already says "1 year")
+- **#15**: Single exercise date (medium)
+- **#17**: Delta parameter interpretation (low)
+- **#18**: Different delta ranges undocumented (low)
+- **#21**: Weighting function guard for p=0 (medium)
+- **#28**: No edge-case error handling (low)
+- **S1-F**: Yield residuals are skewed but simulated with `rnorm()` — understates downside yield risk. Consider a skewed distribution, bootstrapping residuals, or adding a third-moment function (medium)
+
+---
+
+## 4b. Section 1.0 Deep Review (2026-03-03)
+
+Detailed analysis of the nitrogen-yield relationship (lines 20-170).
+
+### Documented (comments added)
+
+| Issue | Description | Location |
+|-------|-------------|----------|
+| **A** | Variation function uses absolute residuals (not squared). E[&#124;e&#124;] ≈ 0.798*sigma underestimates true SD by ~20%. Internally consistent with downstream `rnorm(sd=...)` usage. | Line ~158 |
+| **B** | Only intercept + nitrogen coefficients used downstream, implicitly assuming rainfed + conventional BAU tillage (reference categories). Paper paragraph drafted. | Lines ~1349-1362 |
+| **C** | N = 200 interpolates between FTN = 180 (BAU) and 250 in the EPIC data. | Line ~1342 |
+| **D** | FTN distribution is heavily unbalanced — 67% at 180 kg/ha. | Line ~131 |
+| **E** | Weather/rotation exclusion: effects captured in residual variance since downstream simulation uses fixed management scenario. | Line ~136 |
+| **F** | Normal distribution assumption for stochastic yield errors. Skewness in residuals would warrant a different distribution. | Line ~1370 |
+
+### No action needed
+
+| Issue | Description | Reason |
+|-------|-------------|--------|
+| **G** | Yield can go negative in simulation. | P(yield < 0) ≈ 0.0001% at N = 200; negligible. |
 
 ---
 

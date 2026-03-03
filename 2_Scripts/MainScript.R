@@ -11,6 +11,9 @@ library(urca)
 library(moments)
 library(RColorBrewer)
 
+# Toggle to enable/disable writing output files (CSV tables, PDF figures)
+SAVE_OUTPUTS <- FALSE
+
 # Set seed for replicability
 set.seed(1234)
 
@@ -27,7 +30,7 @@ sim_yield <- read_csv("1_Data/EPIC.csv")
 sim_yield <- sim_yield |>
   filter(
     CROP == "WWHT", # winter wheat only
-    SimUID == 52338 # select one grid location (alternative 52339)
+    SimUID == 52338 # grid location of interest (alternative: 52339)
   ) |>
   mutate(
     YLD = YLD_DM / 0.88, # convert dry matter yield to economic yield (12% moisture content)
@@ -68,9 +71,28 @@ sim_yield <- sim_yield |>
 # descriptive statistics
 sim_yield_summary <- sim_yield |>
   dplyr::select(
-    YLD, FTN, irr, rf, rot_mono, rot_1, rot_2, rot_3, rot_4, rot_6, rot_7,
-    wth_hist, cmip6_ipsl_ssp126, cmip6_ipsl_ssp585, cmip6_mpi_ssp126, cmip6_mpi_ssp585,
-    til_bau, til_min_cons, til_contill_r00, til_contill_r30, til_contill_r60, til_contill_r90
+    YLD,
+    FTN,
+    irr,
+    rf,
+    rot_mono,
+    rot_1,
+    rot_2,
+    rot_3,
+    rot_4,
+    rot_6,
+    rot_7,
+    wth_hist,
+    cmip6_ipsl_ssp126,
+    cmip6_ipsl_ssp585,
+    cmip6_mpi_ssp126,
+    cmip6_mpi_ssp585,
+    til_bau,
+    til_min_cons,
+    til_contill_r00,
+    til_contill_r30,
+    til_contill_r60,
+    til_contill_r90
   ) |>
   pivot_longer(everything(), names_to = "variable", values_to = "value") |>
   group_by(variable) |>
@@ -83,7 +105,9 @@ sim_yield_summary <- sim_yield |>
   ) |>
   mutate(across(where(is.numeric), ~ round(., 2)))
 
-# write_csv(sim_yield_summary, "3_Outputs/Table_YieldDescriptiveStatistics.csv")
+if (SAVE_OUTPUTS) {
+  write_csv(sim_yield_summary, "3_Outputs/Table_YieldDescriptiveStatistics.csv")
+}
 
 #-------------------------------------------------------------------------------
 ## 1.2 Just & Pope production function estimation ------------------------------
@@ -104,9 +128,19 @@ summary <- sim_yield |>
   mutate(across(where(is.numeric), ~ round(., 2)))
 
 summary
-# write_csv(summary, "3_Outputs/Table_YieldSummary.csv")
+# NOTE: FTN distribution is heavily unbalanced — 67% of observations have
+# FTN = 180 (the BAU fertilization rate). The regression is most precisely
+# estimated near this level and less reliable at the extremes (10, 250 kg/ha).
 
-# production function estimation
+if (SAVE_OUTPUTS) {
+  write_csv(summary, "3_Outputs/Table_YieldSummary.csv")
+}
+
+# Production function estimation
+# Weather and rotation dummies are excluded because the downstream simulation
+# uses a fixed management scenario (rainfed, conventional tillage); their
+# effects are captured in the residual variance.
+# The EPIC simulation design varies these factors jointly.
 yield_function <- lmrob(
   YLD ~ sqrt(FTN) +
     FTN +
@@ -126,7 +160,14 @@ summary(yield_function)
 sim_yield <- sim_yield |>
   mutate(residuals = yield_function$residuals, abs_residuals = abs(residuals))
 
-# variation function estimation
+
+# Variation function estimation
+# NOTE: Uses absolute residuals (not squared) as the dependent variable.
+# The standard Just & Pope approach regresses squared residuals to estimate
+# Var[Y|X]. Here, E[|e|] is estimated instead, which for normal errors equals
+# sigma * sqrt(2/pi) ≈ 0.798 * sigma. This is internally consistent with the
+# downstream rnorm(sd = predicted_sigma_yield) call (Section 5.0.1), but the
+# predicted sigma underestimates the true standard deviation by ~20%.
 variation_function <- lmrob(
   abs_residuals ~ sqrt(FTN) +
     FTN +
@@ -148,11 +189,13 @@ models <- list(
   "Variation function" = variation_function
 )
 
-modelsummary(
-  models,
-  output = "3_Outputs/Table_YieldFunction.csv",
-  stars = c("*" = 0.1, "**" = 0.05, "***" = 0.01)
-)
+if (SAVE_OUTPUTS) {
+  modelsummary(
+    models,
+    output = "3_Outputs/Table_YieldFunction.csv",
+    stars = c("*" = 0.1, "**" = 0.05, "***" = 0.01)
+  )
+}
 
 # ===============================================================================
 # 2.0 Price Dynamics ===========================================================
@@ -221,7 +264,9 @@ price_plot <- ggplot(dat, aes(x = Date)) +
 
 price_plot
 
-# ggsave("3_Outputs/Fig_Prices.pdf", plot = price_plot, width = 6, height = 4)
+if (SAVE_OUTPUTS) {
+  ggsave("3_Outputs/Fig_Prices.pdf", plot = price_plot, width = 6, height = 4)
+}
 
 #-------------------------------------------------------------------------------
 ## 2.2 Test for stationarity ---------------------------------------------------
@@ -316,15 +361,34 @@ plot_dif_f <- ggplot(dif_dat, aes(x = Date)) +
 combined_dif_plots <- plot_dif_f / plot_dif_w
 combined_dif_plots
 
-# ggsave("3_Outputs/Fig_DifferencedPrices.pdf", plot = combined_dif_plots, width = 8, height = 6)
+if (SAVE_OUTPUTS) {
+  ggsave(
+    "3_Outputs/Fig_DifferencedPrices.pdf",
+    plot = combined_dif_plots,
+    width = 8,
+    height = 6
+  )
+}
 
 combined_plots <- price_plot / combined_dif_plots
 combined_plots
 
-# ggsave("3_Outputs/Fig_CombinedPrices.pdf", plot = combined_plots, width = 10, height = 8)
+if (SAVE_OUTPUTS) {
+  ggsave(
+    "3_Outputs/Fig_CombinedPrices.pdf",
+    plot = combined_plots,
+    width = 10,
+    height = 8
+  )
+}
 
 # cointegration test
-coint_test <- ca.jo(dat[, c("f_p", "w_p")], type = "trace", ecdet = "trend", K = 2)
+coint_test <- ca.jo(
+  dat[, c("f_p", "w_p")],
+  type = "trace",
+  ecdet = "trend",
+  K = 2
+)
 summary(coint_test)
 # weak evidence of cointegration at 10% level
 
@@ -334,8 +398,15 @@ summary(coint_test)
 
 summary_price_table <- tibble(
   Statistic = c(
-    "Mean", "SD", "Min", "Max", "Skew", "Kurtosis", "ADF test",
-    "KPSS test", "PP test"
+    "Mean",
+    "SD",
+    "Min",
+    "Max",
+    "Skew",
+    "Kurtosis",
+    "ADF test",
+    "KPSS test",
+    "PP test"
   ),
   CAN = c(
     mean(dat$f_p),
@@ -388,7 +459,9 @@ summary_price_table <- summary_price_table %>%
 
 summary_price_table
 
-# write_csv(summary_price_table, "3_Outputs/Table_PriceSummary.csv")
+if (SAVE_OUTPUTS) {
+  write_csv(summary_price_table, "3_Outputs/Table_PriceSummary.csv")
+}
 
 #-------------------------------------------------------------------------------
 ## 2.5 Create deflated prices for later comparison -----------------------------
@@ -552,7 +625,16 @@ VARselect(
 VARselect(
   vardat,
   lag.max = 4,
-  exogen = cbind(dif_dat[, c("w_ps1", "f_ps1", "tt", "tt1", "Q1", "Q2", "Q3", "D")])
+  exogen = cbind(dif_dat[, c(
+    "w_ps1",
+    "f_ps1",
+    "tt",
+    "tt1",
+    "Q1",
+    "Q2",
+    "Q3",
+    "D"
+  )])
 )
 
 # best model according to AIC and BIC is p=1/2 with squared terms
@@ -621,19 +703,21 @@ for (tau in taus_sparse) {
   model_list_w[[paste0("", tau)]] <- rq(mw, tau = tau, data = dif_dat)
 }
 
-modelsummary(
-  model_list_f,
-  title = "Fertilizer Price",
-  output = "3_Outputs/Table_QVAR(1)_FertPrices.csv",
-  stars = c("*" = 0.1, "**" = 0.05, "***" = 0.01)
-)
+if (SAVE_OUTPUTS) {
+  modelsummary(
+    model_list_f,
+    title = "Fertilizer Price",
+    output = "3_Outputs/Table_QVAR(1)_FertPrices.csv",
+    stars = c("*" = 0.1, "**" = 0.05, "***" = 0.01)
+  )
 
-modelsummary(
-  model_list_w,
-  title = "Wheat Price",
-  output = "3_Outputs/Table_QVAR(1)_WheatPrices.csv",
-  stars = c("*" = 0.1, "**" = 0.05, "***" = 0.01)
-)
+  modelsummary(
+    model_list_w,
+    title = "Wheat Price",
+    output = "3_Outputs/Table_QVAR(1)_WheatPrices.csv",
+    stars = c("*" = 0.1, "**" = 0.05, "***" = 0.01)
+  )
+}
 
 # full QVAR estimation
 taus_dense <- seq(0.01, 0.99, by = 0.01)
@@ -651,7 +735,7 @@ w_p1 <- dif_dat$w_p1
 f_p <- dif_dat$f_p
 f_p1 <- dif_dat$f_p1
 
-X <- cbind(1, w_p1, f_p1) # col of 1s for b0
+X <- cbind(1, f_p1, w_p1)
 
 # Inverse distributions
 y_w <- X %*% coeff_w
@@ -797,10 +881,14 @@ for (it in 2:Nt) {
     Xfi <- cbind(1, f_change1, w_change1) # matches mf: intercept, f_p1, w_p1
     Xwi <- cbind(1, f_change1, w_change1) # matches mw: intercept, f_p1, w_p1
 
-    qi <- sample(1:99, 1)
+    # Draw copula-linked quantiles
+    qi_f <- sample(1:99, 1)
+    tau_f <- qi_f / 100
+    tau_w_cond <- coeff_rC[1, qi_f] + coeff_rC[2, qi_f] * tau_f
+    qi_w <- max(1, min(99, round(tau_w_cond * 100)))
 
-    yf_change <- Xfi %*% coeff_f[, qi]
-    yw_change <- Xwi %*% coeff_w[, qi]
+    yf_change <- Xfi %*% coeff_f[, qi_f]
+    yw_change <- Xwi %*% coeff_w[, qi_w]
 
     Ys_changes[1, it, is] <- yf_change
     Ys_changes[2, it, is] <- yw_change
@@ -836,8 +924,16 @@ ggplot(simulated_prices, aes(x = time, y = price_w, group = simulation)) +
 
 # density distributions vs historical prices
 density_plot_f <- ggplot() +
-  geom_density(data = simulated_prices, aes(x = price_f_level, fill = "Simulated"), alpha = 0.5) +
-  geom_density(data = f_data, aes(x = Avg_Price, fill = "Historical"), alpha = 0.4) +
+  geom_density(
+    data = simulated_prices,
+    aes(x = price_f_level, fill = "Simulated"),
+    alpha = 0.5
+  ) +
+  geom_density(
+    data = f_data,
+    aes(x = Avg_Price, fill = "Historical"),
+    alpha = 0.4
+  ) +
   scale_fill_manual(
     name = NULL,
     values = c("Simulated" = "#E41A1C", "Historical" = "#377EB8")
@@ -856,8 +952,16 @@ density_plot_f <- ggplot() +
   )
 
 density_plot_w <- ggplot() +
-  geom_density(data = simulated_prices, aes(x = price_w_level, fill = "Simulated"), alpha = 0.5) +
-  geom_density(data = w_data, aes(x = Avg_Price, fill = "Historical"), alpha = 0.4) +
+  geom_density(
+    data = simulated_prices,
+    aes(x = price_w_level, fill = "Simulated"),
+    alpha = 0.5
+  ) +
+  geom_density(
+    data = w_data,
+    aes(x = Avg_Price, fill = "Historical"),
+    alpha = 0.4
+  ) +
   scale_fill_manual(
     name = NULL,
     values = c("Simulated" = "#E41A1C", "Historical" = "#377EB8")
@@ -878,16 +982,39 @@ density_plot_w <- ggplot() +
 density_plot_f
 density_plot_w
 
-# ggsave("3_Outputs/Fig_PriceDensity_CAN.pdf", plot = density_plot_f, width = 10, height = 6)
-# ggsave("3_Outputs/Fig_PriceDensity_Wheat.pdf", plot = density_plot_w, width = 10, height = 6)
+if (SAVE_OUTPUTS) {
+  ggsave(
+    "3_Outputs/Fig_PriceDensity_CAN.pdf",
+    plot = density_plot_f,
+    width = 10,
+    height = 6
+  )
+  ggsave(
+    "3_Outputs/Fig_PriceDensity_Wheat.pdf",
+    plot = density_plot_w,
+    width = 10,
+    height = 6
+  )
+}
 
 # density distributions vs deflated historical prices
 density_plot_f_deflated <- ggplot() +
-  geom_density(data = simulated_prices, aes(x = price_f_level, fill = "Simulated prices"), alpha = 0.5) +
-  geom_density(data = defl_f_p, aes(x = real_f_p, fill = "Deflated historical prices"), alpha = 0.4) +
+  geom_density(
+    data = simulated_prices,
+    aes(x = price_f_level, fill = "Simulated prices"),
+    alpha = 0.5
+  ) +
+  geom_density(
+    data = defl_f_p,
+    aes(x = real_f_p, fill = "Deflated historical prices"),
+    alpha = 0.4
+  ) +
   scale_fill_manual(
     name = NULL,
-    values = c("Simulated prices" = "#E41A1C", "Deflated historical prices" = "#377EB8")
+    values = c(
+      "Simulated prices" = "#E41A1C",
+      "Deflated historical prices" = "#377EB8"
+    )
   ) +
   labs(
     x = paste0("\n(eur/t), N = ", nrow(simulated_prices)),
@@ -904,11 +1031,22 @@ density_plot_f_deflated <- ggplot() +
   coord_cartesian(ylim = c(0, 0.025))
 
 density_plot_w_deflated <- ggplot() +
-  geom_density(data = simulated_prices, aes(x = price_w_level, fill = "Simulated prices"), alpha = 0.5) +
-  geom_density(data = defl_w_p, aes(x = real_w_p, fill = "Deflated historical prices"), alpha = 0.4) +
+  geom_density(
+    data = simulated_prices,
+    aes(x = price_w_level, fill = "Simulated prices"),
+    alpha = 0.5
+  ) +
+  geom_density(
+    data = defl_w_p,
+    aes(x = real_w_p, fill = "Deflated historical prices"),
+    alpha = 0.4
+  ) +
   scale_fill_manual(
     name = NULL,
-    values = c("Simulated prices" = "#E41A1C", "Deflated historical prices" = "#377EB8")
+    values = c(
+      "Simulated prices" = "#E41A1C",
+      "Deflated historical prices" = "#377EB8"
+    )
   ) +
   labs(
     x = paste0("\n(eur/t), N = ", nrow(simulated_prices)),
@@ -926,7 +1064,14 @@ density_plot_w_deflated <- ggplot() +
 
 deflated_density_plot <- density_plot_f_deflated | density_plot_w_deflated
 
-# ggsave("3_Outputs/Fig_PriceDensity_deflated.pdf", plot = deflated_density_plot, width = 10, height = 6)
+if (SAVE_OUTPUTS) {
+  ggsave(
+    "3_Outputs/Fig_PriceDensity_deflated.pdf",
+    plot = deflated_density_plot,
+    width = 10,
+    height = 6
+  )
+}
 
 
 # ===============================================================================
@@ -975,7 +1120,9 @@ premium_results <- data.frame(
 ) |>
   mutate(across(everything(), ~ round(., 3)))
 
-# write_csv(premium_results, "3_Outputs/Table_ContractPayoff.csv")
+if (SAVE_OUTPUTS) {
+  write_csv(premium_results, "3_Outputs/Table_ContractPayoff.csv")
+}
 
 #-------------------------------------------------------------------------------
 ### 4.1.1 Plot distribution density --------------------------------------------
@@ -986,8 +1133,17 @@ cb_colors <- brewer.pal(3, "Dark2")[1:2]
 
 # Plot density of original sim_f_p with strike prices
 plot_original <- ggplot(data.frame(sim_f_p), aes(x = sim_f_p)) +
-  geom_density(alpha = 0.3, linewidth = 0.5, color = cb_colors[2], fill = cb_colors[2]) +
-  geom_vline(xintercept = strike_vec, color = cb_colors[1], linetype = "dashed") +
+  geom_density(
+    alpha = 0.3,
+    linewidth = 0.5,
+    color = cb_colors[2],
+    fill = cb_colors[2]
+  ) +
+  geom_vline(
+    xintercept = strike_vec,
+    color = cb_colors[1],
+    linetype = "dashed"
+  ) +
   labs(
     x = "Simulated prices and strike levels\n",
     y = "Density"
@@ -1010,8 +1166,14 @@ plot_list <- lapply(seq_along(strike_vec), function(i) {
 
   ggplot(df, aes(x = value, color = type, fill = type)) +
     geom_density(alpha = 0.3, linewidth = 0.5) +
-    scale_color_manual(values = cb_colors, labels = c("Adjusted contract", "No contract")) +
-    scale_fill_manual(values = cb_colors, labels = c("Adjusted contract", "No contract")) +
+    scale_color_manual(
+      values = cb_colors,
+      labels = c("Adjusted contract", "No contract")
+    ) +
+    scale_fill_manual(
+      values = cb_colors,
+      labels = c("Adjusted contract", "No contract")
+    ) +
     labs(
       x = paste("Strike =", k, "\n"),
       y = NULL,
@@ -1024,27 +1186,162 @@ plot_list <- lapply(seq_along(strike_vec), function(i) {
 })
 
 plot_list[[2]] <- plot_list[[2]] + theme(legend.position = "none")
-plot_list[[3]] <- plot_list[[3]] + labs(y = "Density\n") + theme(legend.position = "none")
-plot_list[[4]] <- plot_list[[4]] + labs(x = paste("Strike = 0.375 \n\nPrice (eur/kg)")) + theme(legend.position = "none")
+plot_list[[3]] <- plot_list[[3]] +
+  labs(y = "Density\n") +
+  theme(legend.position = "none")
+plot_list[[4]] <- plot_list[[4]] +
+  labs(x = paste("Strike =", round(strike_vec[4], 3), "\n\nPrice (eur/kg)")) +
+  theme(legend.position = "none")
 plot_list[[5]] <- plot_list[[5]] + theme(legend.position = "none")
 
 # Combine into 2x3 layout
-final_plot <- plot_original + plot_list[[1]] + plot_list[[2]] + plot_list[[3]] +
-  plot_list[[4]] + plot_list[[5]]
+final_plot <- plot_original +
+  plot_list[[1]] +
+  plot_list[[2]] +
+  plot_list[[3]] +
+  plot_list[[4]] +
+  plot_list[[5]]
 
 final_plot
 
-# ggsave("3_Outputs/Fig_PriceDensities_SimulatedStrikes.pdf", plot = final_plot, width = 12, height = 8)
+if (SAVE_OUTPUTS) {
+  ggsave(
+    "3_Outputs/Fig_PriceDensities_SimulatedStrikes.pdf",
+    plot = final_plot,
+    width = 12,
+    height = 8
+  )
+}
 
 # ===============================================================================
 # SIMULATION OF UTILITY OF PROFITS
 # ===============================================================================
+
+#-------------------------------------------------------------------------------
+# Functions for EUT and CPT calculations
+#-------------------------------------------------------------------------------
+
+# Value function (Tversky & Kahneman 1992)
+v <- function(x, a, l, ref) {
+  ifelse(x >= ref, (x - ref)^a, -l * (-(x - ref))^a)
+}
+
+# Probability weighting function (Prelec 1998)
+weighting_function <- function(p, g) {
+  exp(-(-log(p))^g)
+}
+
+# Compute EUT certainty equivalents using Mean-Variance approximation
+compute_eut <- function(profit_df, delta_values) {
+  target_cols <- colnames(profit_df)
+  results_list <- vector("list", length(delta_values) * length(target_cols))
+  idx <- 0L
+  for (d in delta_values) {
+    for (col_name in target_cols) {
+      idx <- idx + 1L
+      profits <- profit_df[[col_name]]
+      mean_profit <- mean(profits)
+      var_profit <- var(profits)
+      RP <- (d / 2) * var_profit
+      CE <- mean_profit - RP
+      results_list[[idx]] <- data.frame(
+        Variable = col_name,
+        Delta = d,
+        CertaintyEquivalent = CE,
+        RiskPremium = RP
+      )
+    }
+  }
+  bind_rows(results_list)
+}
+
+# Compute CPT values for all parameter combinations
+compute_cpt <- function(
+  profit_df,
+  ref_point,
+  a_values,
+  lambda_values,
+  gamma_values
+) {
+  target_cols <- colnames(profit_df)
+  n_combos <- length(a_values) *
+    length(lambda_values) *
+    length(gamma_values) *
+    length(target_cols)
+  results_list <- vector("list", n_combos)
+  idx <- 0L
+
+  for (a in a_values) {
+    for (l in lambda_values) {
+      for (g in gamma_values) {
+        for (col_name in target_cols) {
+          idx <- idx + 1L
+          profits <- sort(profit_df[[col_name]])
+
+          n <- length(profits)
+          probs <- rep(1 / n, n)
+          df <- data.frame(profit = profits, prob = probs)
+
+          losses <- df |>
+            dplyr::filter(profit < ref_point) |>
+            dplyr::arrange(profit)
+          gains <- df |>
+            dplyr::filter(profit >= ref_point) |>
+            dplyr::arrange(dplyr::desc(profit))
+
+          # Decision weights for losses
+          if (nrow(losses) > 0) {
+            losses <- losses |>
+              dplyr::mutate(
+                cum_p = cumsum(prob),
+                dw = weighting_function(cum_p, g) -
+                  weighting_function(cum_p - prob, g)
+              )
+          }
+
+          # Decision weights for gains (weighted separately per TK1992)
+          if (nrow(gains) > 0) {
+            gains <- gains |>
+              dplyr::mutate(
+                cum_p = cumsum(prob),
+                dw = weighting_function(cum_p, g) -
+                  weighting_function(cum_p - prob, g)
+              )
+          }
+
+          loss_value <- if (nrow(losses) > 0) {
+            sum(v(losses$profit, a, l, ref_point) * losses$dw)
+          } else {
+            0
+          }
+
+          gain_value <- if (nrow(gains) > 0) {
+            sum(v(gains$profit, a, l, ref_point) * gains$dw)
+          } else {
+            0
+          }
+
+          results_list[[idx]] <- data.frame(
+            Variable = col_name,
+            Alpha = a,
+            Lambda = l,
+            Gamma = g,
+            CPT_Value = loss_value + gain_value
+          )
+        }
+      }
+    }
+  }
+  bind_rows(results_list)
+}
 
 # ===============================================================================
 # 5.0 Broad framing ============================================================
 # ===============================================================================
 
 # Parameters
+# NOTE: N = 200 interpolates between FTN = 180 (BAU) and 250 in the EPIC data.
+# The sqrt(FTN) + FTN functional form provides smooth interpolation.
 N <- 200 # amount of N applied
 CAN <- N / 0.27 # amount of CAN (27% N)
 
@@ -1052,7 +1349,10 @@ CAN <- N / 0.27 # amount of CAN (27% N)
 ### 5.0.1 Simulate stochastic yields -------------------------------------------
 #-------------------------------------------------------------------------------
 
-# get coeff from production function regression
+# Get coeff from production function regression
+# Only intercept + nitrogen coefficients are used, which implicitly predicts
+# for rainfed + conventional BAU tillage (the reference categories, where
+# irr = 0 and all tillage dummies = 0).
 coeff_0_yield <- yield_function$coefficients[1]
 coeff_1_yield <- yield_function$coefficients[2]
 coeff_2_yield <- yield_function$coefficients[3]
@@ -1060,7 +1360,8 @@ coeff_2_yield <- yield_function$coefficients[3]
 # generate predicted yield
 predicted_yield <- coeff_0_yield + coeff_1_yield * sqrt(N) + coeff_2_yield * N
 
-# get coeff from variation function regression
+# Get coeff from variation function regression
+# Same reference scenario: rainfed + conventional BAU tillage.
 coeff_0_varf <- variation_function$coefficients[1]
 coeff_1_varf <- variation_function$coefficients[2]
 
@@ -1071,6 +1372,9 @@ predicted_sigma_yield <- coeff_0_varf + coeff_1_varf * sqrt(N)
 stochastic_error <- array(dim = c(Ns, simulated_years))
 
 for (t in 1:simulated_years) {
+  # NOTE: Assumes normally distributed yield errors. If residuals from the
+  # yield function are significantly skewed (e.g., left-skew from drought),
+  # consider using a skewed distribution or adding a third-moment function.
   stochastic_error[, t] <- rnorm(n = Ns, mean = 0, sd = predicted_sigma_yield)
 }
 
@@ -1121,7 +1425,9 @@ for (i in 1:nrow(premium_results)) {
 
   sim_f_p_adj_contr <- pmin(sim_f_p, k)
 
-  profit_ac <- (sim_w_p * simulated_yield) - (sim_f_p_adj_contr * CAN) - (contract_cost * CAN)
+  profit_ac <- (sim_w_p * simulated_yield) -
+    (sim_f_p_adj_contr * CAN) -
+    (contract_cost * CAN)
 
   # Add result columns for each strike price
   col_name <- paste0("ac_", i)
@@ -1165,21 +1471,27 @@ for (i in 1:nrow(premium_results)) {
     strike = k,
 
     # stats for capped simulated prices
-    mean   = mean(sim_f_p_adj_contr),
+    mean = mean(sim_f_p_adj_contr),
     median = median(sim_f_p_adj_contr),
-    sd     = sd(sim_f_p_adj_contr),
-    min    = min(sim_f_p_adj_contr),
-    max    = max(sim_f_p_adj_contr)
+    sd = sd(sim_f_p_adj_contr),
+    min = min(sim_f_p_adj_contr),
+    max = max(sim_f_p_adj_contr)
   )
 }
 
 # combine into a single dataframe
-price_stats_table <- bind_rows(base_row_sim_prices, base_row_forward_prices, stats_list) |>
+price_stats_table <- bind_rows(
+  base_row_sim_prices,
+  base_row_forward_prices,
+  stats_list
+) |>
   mutate(across(where(is.numeric), ~ round(., 3)))
 
 price_stats_table
 
-# write_csv(price_stats_table, "3_Outputs/Table_ResultsPriceStats.csv")
+if (SAVE_OUTPUTS) {
+  write_csv(price_stats_table, "3_Outputs/Table_ResultsPriceStats.csv")
+}
 
 #-------------------------------------------------------------------------------
 ### 5.1.2 Total costs under different contracts --------------------------------
@@ -1213,21 +1525,27 @@ for (i in 1:nrow(premium_results)) {
 
   stats_list[[i]] <- tibble(
     strike = k,
-    mean   = mean((sim_f_p_adj_contr * CAN) + (cost * CAN)),
+    mean = mean((sim_f_p_adj_contr * CAN) + (cost * CAN)),
     median = median((sim_f_p_adj_contr * CAN) + (cost * CAN)),
-    sd     = sd((sim_f_p_adj_contr * CAN) + (cost * CAN)),
-    min    = min((sim_f_p_adj_contr * CAN) + (cost * CAN)),
-    max    = max((sim_f_p_adj_contr * CAN) + (cost * CAN))
+    sd = sd((sim_f_p_adj_contr * CAN) + (cost * CAN)),
+    min = min((sim_f_p_adj_contr * CAN) + (cost * CAN)),
+    max = max((sim_f_p_adj_contr * CAN) + (cost * CAN))
   )
 }
 
 # combine into a single dataframe
-costs_stats_table <- bind_rows(base_row_costs, base_row_forward_costs, stats_list) |>
+costs_stats_table <- bind_rows(
+  base_row_costs,
+  base_row_forward_costs,
+  stats_list
+) |>
   mutate(across(where(is.numeric), ~ round(., 2)))
 
 costs_stats_table
 
-# write_csv(costs_stats_table, "3_Outputs/Table_ResultsCostsStats.csv")
+if (SAVE_OUTPUTS) {
+  write_csv(costs_stats_table, "3_Outputs/Table_ResultsCostsStats.csv")
+}
 
 #-------------------------------------------------------------------------------
 ### 5.1.3 Total profits under different contracts ------------------------------
@@ -1247,7 +1565,9 @@ summary_profits <- df_simulated_profit |>
 
 summary_profits
 
-# write_csv(summary_profits, "3_Outputs/Table_ResultsProfitStats.csv")
+if (SAVE_OUTPUTS) {
+  write_csv(summary_profits, "3_Outputs/Table_ResultsProfitStats.csv")
+}
 
 #-------------------------------------------------------------------------------
 ## 5.2 Expected Utility Theory (EUT) values under broad framing ----------------
@@ -1258,31 +1578,10 @@ delta <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005)
 
 target_cols <- colnames(df_simulated_profit)
 
-# CE and RP with Mean-Variance approach
-eut_results_broadframing <- data.frame(
-  Variable = character(),
-  Delta = numeric(),
-  CertaintyEquivalent = numeric(),
-  RiskPremium = numeric()
-)
-
-for (d in delta) {
-  for (c in target_cols) {
-    profits <- df_simulated_profit[[c]]
-
-    mean_profit <- mean(profits)
-    var_profit <- var(profits)
-    RP <- ((d / 2) * var_profit)
-    CE <- mean_profit - RP
-
-    eut_results_broadframing <- rbind(eut_results_broadframing, data.frame(
-      Variable = c,
-      Delta = d,
-      CertaintyEquivalent = CE,
-      RiskPremium = RP
-    ))
-  }
-}
+# CE and RP with Mean-Variance approximation: CE = E[π] - (δ/2)·Var[π]
+# This is a second-order Taylor approximation of expected utility, valid when
+# the distribution of profits is approximately normal or risk aversion is small.
+eut_results_broadframing <- compute_eut(df_simulated_profit, delta)
 
 # make table of results
 eut_results_broadframing <- eut_results_broadframing |>
@@ -1314,7 +1613,12 @@ colnames(eut_results_broadframing) <- c(
 
 eut_results_broadframing
 
-# write_csv(eut_results_broadframing, "3_Outputs/Table_Results_EUT_Broadframing.csv")
+if (SAVE_OUTPUTS) {
+  write_csv(
+    eut_results_broadframing,
+    "3_Outputs/Table_Results_EUT_Broadframing.csv"
+  )
+}
 
 #-------------------------------------------------------------------------------
 ## 5.3 Cumulative Prospect Theory (CPT) under broad framing --------------------
@@ -1329,99 +1633,18 @@ lambda <- c(0.5, 1.574, 2)
 # probability weighting
 gamma <- c(0.4, 0.571, 0.7)
 
-# reference point
-ref_point <- mean(df_simulated_profit$fc)
+# Reference point: expected profit under the status quo hedging strategy
+# (forward contract/buy and hold strategy). This represents the farmer's natural
+# benchmark for evaluating alternative risk management contracts.
+ref_point_broad <- mean(df_simulated_profit$fc)
 
-# Initialize result data frame
-cpt_results_broadframing <- data.frame(
-  Variable = character(),
-  a = numeric(),
-  lambda = numeric(),
-  gamma = numeric(),
-  CPT_Value = numeric()
+cpt_results_broadframing <- compute_cpt(
+  df_simulated_profit,
+  ref_point_broad,
+  a_values,
+  lambda,
+  gamma
 )
-
-# value function
-v <- function(x, a, l) {
-  ifelse(x >= ref_point, (x - ref_point)^a, -l * (-(x - ref_point))^a)
-}
-
-# weighting function
-weighting_function <- function(p, g) {
-  exp(-(-log(p))^g)
-}
-
-
-for (a in a_values) {
-  for (l in lambda) {
-    for (g in gamma) {
-      for (c in target_cols) {
-        # get the current profit vector and set the reference point
-        profits <- sort(df_simulated_profit[[c]])
-
-        # uniform probabilities
-        n <- length(profits)
-        probs <- rep(1 / n, n)
-        df <- data.frame(profit = profits, prob = probs)
-
-        # Separate into losses and gains and order
-        losses <- df |>
-          dplyr::filter(profit < ref_point) |>
-          dplyr::arrange(profit)
-        gains <- df |>
-          dplyr::filter(profit >= ref_point) |>
-          dplyr::arrange(dplyr::desc(profit))
-
-        # Calculate Decision Weights (dw) for Losses
-        if (nrow(losses) > 0) {
-          losses <- losses |>
-            dplyr::mutate(
-              cum_p = cumsum(prob),
-              dw = weighting_function(cum_p, g) - weighting_function(cum_p - prob, g)
-            )
-        }
-
-        # Calculate Decision Weights (dw) for Gains
-        if (nrow(gains) > 0) {
-          # Get the highest cumulative probability from losses
-          cum_p_losses <- if (nrow(losses) > 0) max(losses$cum_p) else 0
-
-          gains <- gains |>
-            dplyr::mutate(
-              cum_p = cum_p_losses + cumsum(prob),
-              dw = weighting_function(cum_p, g) - weighting_function(cum_p - prob, g)
-            )
-        }
-
-        # Calculate CPT Value
-        loss_value <- if (nrow(losses) > 0) {
-          sum(v(losses$profit, a, l) * losses$dw)
-        } else {
-          0
-        }
-
-        gain_value <- if (nrow(gains) > 0) {
-          sum(v(gains$profit, a, l) * gains$dw)
-        } else {
-          0
-        }
-
-        cpt_val_current <- loss_value + gain_value
-
-        # 7. Store the result
-        new_row <- data.frame(
-          Variable = c,
-          Alpha = a,
-          Lambda = l,
-          Gamma = g,
-          CPT_Value = cpt_val_current
-        )
-
-        cpt_results_broadframing <- rbind(cpt_results_broadframing, new_row)
-      }
-    }
-  }
-}
 
 #-------------------------------------------------------------------------------
 ### 5.3.1 display CPT results --------------------------------------------------
@@ -1498,7 +1721,9 @@ final_cpt_table <- bind_rows(std_row, alpha_rows, lambda_rows, gamma_rows) |>
 
 final_cpt_table
 
-# write_csv(final_cpt_table, "3_Outputs/Table_Results_CPT_BroadFraming.csv")
+if (SAVE_OUTPUTS) {
+  write_csv(final_cpt_table, "3_Outputs/Table_Results_CPT_BroadFraming.csv")
+}
 
 # ===============================================================================
 # 6.0 Narrow Framing ===========================================================
@@ -1545,7 +1770,12 @@ summary_profits_narrowframing <- df_profit_narrowframing |>
 
 summary_profits_narrowframing
 
-# write_csv(summary_profits_narrowframing, "3_Outputs/Table_Results_Profits_NarrowFraming.csv")
+if (SAVE_OUTPUTS) {
+  write_csv(
+    summary_profits_narrowframing,
+    "3_Outputs/Table_Results_Profits_NarrowFraming.csv"
+  )
+}
 
 #-------------------------------------------------------------------------------
 ## 6.1 Expected Utility Theory (EUT) under narrow framing ----------------------
@@ -1555,30 +1785,8 @@ delta <- c(0, 0.0005, 0.0007, 0.001, 0.003)
 
 target_cols <- colnames(df_profit_narrowframing)
 
-eut_results_narrowframing <- data.frame(
-  Variable = character(),
-  Delta = numeric(),
-  RiskPremium = numeric(),
-  CertaintyEquivalent = numeric()
-)
-
-for (d in delta) {
-  for (c in target_cols) {
-    profits <- df_profit_narrowframing[[c]]
-
-    RP <- ((d / 2) * var(profits))
-    CE <- mean(profits) - RP
-
-    temporary_results <- data.frame(
-      Variable = c,
-      Delta = d,
-      RiskPremium = RP,
-      CertaintyEquivalent = CE
-    )
-
-    eut_results_narrowframing <- rbind(eut_results_narrowframing, temporary_results)
-  }
-}
+# CE and RP with Mean-Variance approximation: CE = E[π] - (δ/2)·Var[π]
+eut_results_narrowframing <- compute_eut(df_profit_narrowframing, delta)
 
 # make table of results
 final_eut_table_narrowframing <- eut_results_narrowframing |>
@@ -1610,93 +1818,26 @@ colnames(final_eut_table_narrowframing) <- c(
 
 final_eut_table_narrowframing
 
-# write_csv(final_eut_table_narrowframing, "3_Outputs/Table_Results_EUT_NarrowFraming.csv")
+if (SAVE_OUTPUTS) {
+  write_csv(
+    final_eut_table_narrowframing,
+    "3_Outputs/Table_Results_EUT_NarrowFraming.csv"
+  )
+}
 
 #-------------------------------------------------------------------------------
 ## 6.2 Cumulative Prospect Theory (CPT) under narrow framing -------------------
 #-------------------------------------------------------------------------------
 
-ref_point <- 0
+ref_point_narrow <- 0
 
-# Initialize result data frame
-cpt_results_nf <- data.frame(
-  Variable = character(),
-  a = numeric(),
-  lambda = numeric(),
-  gamma = numeric(),
-  CPT_Value = numeric()
+cpt_results_nf <- compute_cpt(
+  df_profit_narrowframing,
+  ref_point_narrow,
+  a_values,
+  lambda,
+  gamma
 )
-
-for (a in a_values) {
-  for (l in lambda) {
-    for (g in gamma) {
-      for (c in target_cols) {
-        # get the current profit vector and set the reference point
-        profits <- sort(df_profit_narrowframing[[c]])
-
-        # uniform probabilities
-        n <- length(profits)
-        probs <- rep(1 / n, n)
-        df <- data.frame(profit = profits, prob = probs)
-
-        # Separate into losses and gains and order
-        losses <- df |>
-          dplyr::filter(profit < ref_point) |>
-          dplyr::arrange(profit)
-        gains <- df |>
-          dplyr::filter(profit >= ref_point) |>
-          dplyr::arrange(dplyr::desc(profit))
-
-        # Calculate Decision Weights (dw) for Losses
-        if (nrow(losses) > 0) {
-          losses <- losses |>
-            dplyr::mutate(
-              cum_p = cumsum(prob),
-              dw = weighting_function(cum_p, g) - weighting_function(cum_p - prob, g)
-            )
-        }
-
-        # Calculate Decision Weights (dw) for Gains
-        if (nrow(gains) > 0) {
-          # Get the highest cumulative probability from losses
-          cum_p_losses <- if (nrow(losses) > 0) max(losses$cum_p) else 0
-
-          gains <- gains |>
-            dplyr::mutate(
-              cum_p = cum_p_losses + cumsum(prob),
-              dw = weighting_function(cum_p, g) - weighting_function(cum_p - prob, g)
-            )
-        }
-
-        # Calculate CPT Value
-        loss_value <- if (nrow(losses) > 0) {
-          sum(v(losses$profit, a, l) * losses$dw)
-        } else {
-          0
-        }
-
-        gain_value <- if (nrow(gains) > 0) {
-          sum(v(gains$profit, a, l) * gains$dw)
-        } else {
-          0
-        }
-
-        cpt_val_current <- loss_value + gain_value
-
-        # 7. Store the result
-        new_row <- data.frame(
-          Variable = c,
-          Alpha = a,
-          Lambda = l,
-          Gamma = g,
-          CPT_Value = cpt_val_current
-        )
-
-        cpt_results_nf <- rbind(cpt_results_nf, new_row)
-      } # End col_name loop
-    } # End gamma loop
-  } # End lambda loop
-} # End alpha loop
 
 #-------------------------------------------------------------------------------
 ### 6.2.1 display CPT results --------------------------------------------------
@@ -1767,10 +1908,20 @@ gamma_rows <- cpt_results_nf |>
   mutate(Scenario = paste0("Gamma = ", Scenario))
 
 # combine
-final_cpt_narrowframing <- bind_rows(std_row, alpha_rows, lambda_rows, gamma_rows) |>
+final_cpt_narrowframing <- bind_rows(
+  std_row,
+  alpha_rows,
+  lambda_rows,
+  gamma_rows
+) |>
   relocate(Scenario) |>
   mutate(across(where(is.numeric), ~ round(., 2)))
 
 final_cpt_narrowframing
 
-# write_csv(final_cpt_narrowframing, "3_Outputs/Table_Results_CPT_NarrowFraming.csv")
+if (SAVE_OUTPUTS) {
+  write_csv(
+    final_cpt_narrowframing,
+    "3_Outputs/Table_Results_CPT_NarrowFraming.csv"
+  )
+}
