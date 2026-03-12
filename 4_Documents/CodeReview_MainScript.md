@@ -155,11 +155,11 @@ Detailed analysis of the nitrogen-yield relationship (lines 20-170).
 
 ## 5. Relationship to TODO Items
 
-| TODO Item | Related Issues |
-|-----------|---------------|
-| Fix yield estimation under different scenarios | #5, #6 |
-| Deal with outliers in price time series | Partially addressed by robust regression; price series needs explicit outlier treatment |
-| Change starting price for the simulation | #13 |
-| Update graph with vertical bars and colors | #29 (hardcoded label); strike bars already exist in `plot_original` |
-| Integrate ambiguity theory | New section needed; could extend CPT framework |
-| Create minimum price contract for output prices | New section needed; analogous to Section 4 but for wheat |
+| TODO Item | Status | Related Issues |
+|-----------|--------|---------------|
+| Fix yield estimation under different scenarios | Open | #5, #6 |
+| Deal with outliers in price time series | Open | Partially addressed by robust regression; price series needs explicit outlier treatment |
+| Change starting price for the simulation | Open | #13 |
+| Update graph with vertical bars and colors | Open | #29 (hardcoded label); strike bars already exist in `plot_original` |
+| Integrate ambiguity theory | Open | New section needed; could extend CPT framework |
+| ~~Create minimum price contract for output prices~~ | **DONE 2026-03-11** | Sections 4.2, 4.2.1 added; wc_* and both_* columns in Sections 5 and 6 |

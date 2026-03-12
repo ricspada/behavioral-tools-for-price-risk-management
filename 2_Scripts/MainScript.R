@@ -210,7 +210,7 @@ f_data <- read_csv("1_Data/FertilizerPrices.csv")
 f_data <- f_data[f_data[[2]] == "CAN", ]
 
 # keep data only for Bread wheat
-w_data <- read_csv("1_Data/Wheatprices.csv")
+w_data <- read_csv("1_Data/WheatPrices.csv")
 w_data <- w_data[w_data[[2]] == "Bread_Wheat", ] # alt. 'Feed_Wheat'
 
 # Check time ranges
@@ -1087,11 +1087,7 @@ int <- 0.03 # Interest rate
 T_years <- 0.5 # time to maturity (6 months)
 discount_factor <- 1 / (1 + int)^T_years
 
-#-------------------------------------------------------------------------------
-## 4.1 pricing based on simulated nitrogen prices ------------------------------
-#-------------------------------------------------------------------------------
-
-# get simulated prices
+# get simulated fertilizer prices
 sim_f_p <- array(dim = c(Ns, simulated_years))
 
 for (t in 1:simulated_years) {
@@ -1099,6 +1095,17 @@ for (t in 1:simulated_years) {
   sim_f_p[, t] <- exp(as.vector(Ys_levels[1, time, ])) / 1000
 }
 sim_f_p_df <- data.frame(sim_f_p)
+
+# get simulated wheat prices (t=13, early July)
+output_selling_time <- 13 + (0:(simulated_years - 1)) * obs_per_year
+sim_w_p <- array(dim = c(Ns, simulated_years))
+for (t in 1:simulated_years) {
+  sim_w_p[, t] <- exp(as.vector(Ys_levels[2, output_selling_time[t], ]))
+}
+
+#-------------------------------------------------------------------------------
+## 4.1 Input contract pricing based on simulated prices ------------------------
+#-------------------------------------------------------------------------------
 
 # define strike prices
 max_prices <- quantile(sim_f_p, probs = c(0.5, 0.6, 0.7, 0.8, 0.9))
@@ -1213,13 +1220,134 @@ if (SAVE_OUTPUTS) {
   )
 }
 
-# ===============================================================================
-# SIMULATION OF UTILITY OF PROFITS
-# ===============================================================================
+#-------------------------------------------------------------------------------
+## 4.2 Output Contract Pricing based on simulated wheat prices -----------------
+#-------------------------------------------------------------------------------
+
+# Wheat is sold at t=13 (early July), approximately 12 months from the autumn
+# reference at which contracts are initiated. The put option matures at delivery.
+T_years_w <- 1.0
+discount_factor_w <- 1 / (1 + int)^T_years_w
+
+# Strike prices: lower quantiles provide downside (floor) protection on revenue.
+# Symmetric to the fertilizer call's 0.5-0.9 range: same 40-pct span, lower tail.
+min_prices <- quantile(sim_w_p, probs = c(0.1, 0.2, 0.3, 0.4, 0.5))
+
+premium_array_w <- numeric(length(min_prices))
+
+for (i in seq_along(min_prices)) {
+  strike_w <- min_prices[i]
+
+  # Put option payoff: max(k_w - P_w, 0) per tonne
+  payoff_w <- pmax(strike_w - sim_w_p, 0)
+  premium_array_w[i] <- mean(payoff_w * discount_factor_w)
+}
+
+premium_results_w <- data.frame(
+  strike_price = min_prices,
+  option_premium = premium_array_w
+) |>
+  mutate(across(everything(), ~ round(., 3)))
+
+premium_results_w
+
+if (SAVE_OUTPUTS) {
+  write_csv(premium_results_w, "3_Outputs/Table_ContractPayoff_Wheat.csv")
+}
 
 #-------------------------------------------------------------------------------
-# Functions for EUT and CPT calculations
+### 4.2.1 Plot distribution density (wheat put option) -------------------------
 #-------------------------------------------------------------------------------
+
+strike_vec_w <- premium_results_w$strike_price
+
+# Plot density of sim_w_p with strike price levels
+plot_original_w <- ggplot(data.frame(sim_w_p), aes(x = sim_w_p)) +
+  geom_density(
+    alpha = 0.3,
+    linewidth = 0.5,
+    color = cb_colors[2],
+    fill = cb_colors[2]
+  ) +
+  geom_vline(
+    xintercept = strike_vec_w,
+    color = cb_colors[1],
+    linetype = "dashed"
+  ) +
+  labs(
+    x = "Simulated wheat prices and strike levels\n",
+    y = "Density"
+  ) +
+  theme_minimal()
+
+# One plot per strike price (floored distribution)
+plot_list_w <- lapply(seq_along(strike_vec_w), function(i) {
+  k_w <- strike_vec_w[i]
+  sim_w_p_adj <- pmax(sim_w_p, k_w)
+
+  df_w <- data.frame(
+    value = c(sim_w_p, sim_w_p_adj),
+    type = c(
+      rep("Original", length(sim_w_p)),
+      rep(paste0("Floored (k = ", k_w, ")"), length(sim_w_p_adj))
+    )
+  )
+
+  ggplot(df_w, aes(x = value, color = type, fill = type)) +
+    geom_density(alpha = 0.3, linewidth = 0.5) +
+    scale_color_manual(
+      values = cb_colors,
+      labels = c("Min-price contract", "No contract")
+    ) +
+    scale_fill_manual(
+      values = cb_colors,
+      labels = c("Min-price contract", "No contract")
+    ) +
+    labs(
+      x = paste("Strike =", k_w, "\n"),
+      y = NULL,
+      color = NULL,
+      fill = NULL
+    ) +
+    theme_minimal() +
+    theme(legend.position = "top")
+})
+
+plot_list_w[[2]] <- plot_list_w[[2]] + theme(legend.position = "none")
+plot_list_w[[3]] <- plot_list_w[[3]] +
+  labs(y = "Density\n") +
+  theme(legend.position = "none")
+plot_list_w[[4]] <- plot_list_w[[4]] +
+  labs(x = paste("Strike =", round(strike_vec_w[4], 3), "\n\nPrice (eur/t)")) +
+  theme(legend.position = "none")
+plot_list_w[[5]] <- plot_list_w[[5]] + theme(legend.position = "none")
+
+# Combine into 2x3 layout
+final_plot_w <- plot_original_w +
+  plot_list_w[[1]] +
+  plot_list_w[[2]] +
+  plot_list_w[[3]] +
+  plot_list_w[[4]] +
+  plot_list_w[[5]]
+
+final_plot_w
+
+if (SAVE_OUTPUTS) {
+  ggsave(
+    "3_Outputs/Fig_PriceDensities_SimulatedStrikes_Wheat.pdf",
+    plot = final_plot_w,
+    width = 12,
+    height = 8
+  )
+}
+
+# ==============================================================================
+# 5.0 Simulation of Utility of profits -----------------------------------------
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+## 5.1 Functions for EUT and CPT calculations ----------------------------------
+# ------------------------------------------------------------------------------
 
 # Value function (Tversky & Kahneman 1992)
 v <- function(x, a, l, ref) {
@@ -1336,7 +1464,7 @@ compute_cpt <- function(
 }
 
 # ===============================================================================
-# 5.0 Broad framing ============================================================
+## 5.2 Broad framing ============================================================
 # ===============================================================================
 
 # Parameters
@@ -1346,7 +1474,7 @@ N <- 200 # amount of N applied
 CAN <- N / 0.27 # amount of CAN (27% N)
 
 #-------------------------------------------------------------------------------
-### 5.0.1 Simulate stochastic yields -------------------------------------------
+### 5.2.1 Simulate stochastic yields -------------------------------------------
 #-------------------------------------------------------------------------------
 
 # Get coeff from production function regression
@@ -1385,25 +1513,18 @@ for (t in 1:simulated_years) {
   simulated_yield[, t] <- predicted_yield + stochastic_error[, t]
 }
 
-# get simulated wheat prices (t = 13 -> early July)
-output_selling_time <- 13 + (0:(simulated_years - 1)) * obs_per_year
-
-sim_w_p <- array(dim = c(Ns, simulated_years))
-
-# get simulated wheat prices (t = 13 -> early July)
-for (t in 1:simulated_years) {
-  time <- output_selling_time[t]
-  sim_w_p[, t] <- exp(as.vector(Ys_levels[2, time, ]))
-}
-
-str(Ys_levels)
+# sim_w_p and output_selling_time extracted in Section 4 (above)
 
 #-------------------------------------------------------------------------------
-### 5.0.2 Get price simulations and calculate profits --------------------------
+### 5.2.2 Get price simulations and calculate profits --------------------------
 #-------------------------------------------------------------------------------
 
 # get forward price
 sim_f_p_forward <- rep(tail(f_data$Avg_Price / 1000, 1) * discount_factor, Ns)
+
+# wheat forward price: last observed wheat price discounted to harvest
+# w_data$Avg_Price is in eur/t (no /1000 conversion needed unlike fertilizer)
+sim_w_p_forward <- rep(tail(w_data$Avg_Price, 1) * discount_factor_w, Ns)
 
 # Calculate "no contract" profits
 profit_nc <- (sim_w_p * simulated_yield) - (sim_f_p * CAN)
@@ -1434,12 +1555,42 @@ for (i in 1:nrow(premium_results)) {
   df_simulated_profit[[col_name]] <- profit_ac
 }
 
+# Wheat minimum-price contracts (wc_j): spot fertilizer + floored wheat revenue ----
+for (j in 1:nrow(premium_results_w)) {
+  k_w <- premium_results_w$strike_price[j]
+  c_w <- premium_results_w$option_premium[j]
+
+  profit_wc <- (pmax(sim_w_p, k_w) * simulated_yield) -
+    (c_w * simulated_yield) - # put premium (eur/t) x yield (t/ha) = eur/ha
+    (sim_f_p * CAN) # fertilizer at spot price
+
+  col_name <- paste0("wc_", j)
+  df_simulated_profit[[col_name]] <- profit_wc
+}
+
+# Combined fertilizer max-price + wheat min-price contracts (both_i, diagonal) ----
+# Strike i for fertilizer is paired with strike i for wheat (rank-matched)
+for (i in 1:nrow(premium_results)) {
+  k_f <- premium_results$strike_price[i]
+  c_f <- premium_results$option_premium[i]
+  k_w <- premium_results_w$strike_price[i]
+  c_w <- premium_results_w$option_premium[i]
+
+  profit_both <- (pmax(sim_w_p, k_w) * simulated_yield) -
+    (c_w * simulated_yield) - # wheat put premium (eur/ha)
+    (pmin(sim_f_p, k_f) * CAN) - # fertilizer capped at k_f
+    (c_f * CAN) # fertilizer call premium (eur/ha)
+
+  col_name <- paste0("both_", i)
+  df_simulated_profit[[col_name]] <- profit_both
+}
+
 #-------------------------------------------------------------------------------
-## 5.1 Summary tables ----------------------------------------------------------
+## 5.3 Summary tables ----------------------------------------------------------
 #-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
-### 5.1.1 CAN price paid under different contracts -----------------------------
+### 5.3.1 CAN price paid under different contracts -----------------------------
 #-------------------------------------------------------------------------------
 
 base_row_sim_prices <- tibble(
@@ -1494,7 +1645,7 @@ if (SAVE_OUTPUTS) {
 }
 
 #-------------------------------------------------------------------------------
-### 5.1.2 Total costs under different contracts --------------------------------
+### 5.3.2 Total costs under different contracts --------------------------------
 #-------------------------------------------------------------------------------
 
 base_row_costs <- tibble(
@@ -1548,7 +1699,7 @@ if (SAVE_OUTPUTS) {
 }
 
 #-------------------------------------------------------------------------------
-### 5.1.3 Total profits under different contracts ------------------------------
+### 5.3.3 Total profits under different contracts ------------------------------
 #-------------------------------------------------------------------------------
 
 summary_profits <- df_simulated_profit |>
@@ -1570,7 +1721,7 @@ if (SAVE_OUTPUTS) {
 }
 
 #-------------------------------------------------------------------------------
-## 5.2 Expected Utility Theory (EUT) values under broad framing ----------------
+## 5.4 Expected Utility Theory (EUT) values under broad framing ----------------
 #-------------------------------------------------------------------------------
 
 # define absolute risk aversion values
@@ -1621,7 +1772,7 @@ if (SAVE_OUTPUTS) {
 }
 
 #-------------------------------------------------------------------------------
-## 5.3 Cumulative Prospect Theory (CPT) under broad framing --------------------
+## 5.5 Cumulative Prospect Theory (CPT) under broad framing --------------------
 #-------------------------------------------------------------------------------
 
 # risk aversion
@@ -1647,7 +1798,7 @@ cpt_results_broadframing <- compute_cpt(
 )
 
 #-------------------------------------------------------------------------------
-### 5.3.1 display CPT results --------------------------------------------------
+### 5.5.1 display CPT results --------------------------------------------------
 #-------------------------------------------------------------------------------
 
 # standard assumptions
@@ -1751,6 +1902,34 @@ for (i in 1:nrow(premium_results)) {
   # Add column with name ac_1, ac_2, etc.
   col_name <- paste0("ac_", i)
   df_profit_narrowframing[[col_name]] <- profit_ac
+}
+
+# Wheat put option: narrow framing payoff (per ha) ----
+# Uses predicted_yield (fixed) to isolate price risk,
+# consistent with CAN being fixed on the fertilizer side.
+for (j in 1:nrow(premium_results_w)) {
+  k_w <- premium_results_w$strike_price[j]
+  c_w <- premium_results_w$option_premium[j]
+
+  profit_wc_nf <- predicted_yield * (pmax(k_w - sim_w_p, 0) - c_w)
+
+  col_name <- paste0("wc_", j)
+  df_profit_narrowframing[[col_name]] <- profit_wc_nf
+}
+
+# Combined narrow framing: diagonal — fertilizer call i + wheat put i ----
+for (i in 1:nrow(premium_results)) {
+  k_f <- premium_results$strike_price[i]
+  c_f <- premium_results$option_premium[i]
+  k_w <- premium_results_w$strike_price[i]
+  c_w <- premium_results_w$option_premium[i]
+
+  profit_both_nf <- CAN *
+    (pmax(sim_f_p - k_f, 0) - c_f) +
+    predicted_yield * (pmax(k_w - sim_w_p, 0) - c_w)
+
+  col_name <- paste0("both_", i)
+  df_profit_narrowframing[[col_name]] <- profit_both_nf
 }
 
 df_profit_narrowframing
