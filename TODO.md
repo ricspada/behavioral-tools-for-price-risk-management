@@ -7,7 +7,10 @@
 - [ ] Change starting price for the simulation (Issue 13)
     - [ ] Use historical average or expected price
 - [ ] Bootstrapping (Frederic)
-- [ ] Strike prices based on historical or simulated prices?
+- [ ] Replace diagonal pairing (both_i) with full 25-combination grid (all fertilizer × wheat strike pairs)
+- [ ] Run Sections 4–6 end-to-end and verify all checks pass (plan.md F.2)
+- [ ] Run Croptype.R in RStudio to generate wheat region map (Rscript not on PATH in shell; script ready)
+- [ ] Decide whether to keep all 8 years of DLR CropTypes data or only 2024
 
 ## Completed
 - [x] Fix X-matrix column order in QVAR (Issue #7)
@@ -22,3 +25,5 @@
 - [x] Fix hardcoded strike label (Issue #29)
 - [x] Use list pre-allocation instead of rbind (Issue #23)
 - [x] Create a minimum price contract for output prices
+- [x] Add wheat price and revenue summary tables (S5.10)
+- [x] Create presentation deck with updated results

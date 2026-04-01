@@ -128,9 +128,8 @@ summary <- sim_yield |>
   mutate(across(where(is.numeric), ~ round(., 2)))
 
 summary
-# NOTE: FTN distribution is heavily unbalanced — 67% of observations have
-# FTN = 180 (the BAU fertilization rate). The regression is most precisely
-# estimated near this level and less reliable at the extremes (10, 250 kg/ha).
+# NOTE: FTN distribution is heavily unbalanced, majority of observations have
+# FTN = 180 (the BAU fertilization rate).
 
 if (SAVE_OUTPUTS) {
   write_csv(summary, "3_Outputs/Table_YieldSummary.csv")
@@ -160,9 +159,13 @@ summary(yield_function)
 sim_yield <- sim_yield |>
   mutate(residuals = yield_function$residuals, abs_residuals = abs(residuals))
 
+residuals <- yield_function$residuals
+hist(residuals, breaks = 50)
+shapiro.test(sample(residuals, 500))
+skewness(residuals)
 
 # Variation function estimation
-# NOTE: Uses absolute residuals (not squared) as the dependent variable.
+# ISSUE: Use absolute residuals (not squared) as the dependent variable.
 # The standard Just & Pope approach regresses squared residuals to estimate
 # Var[Y|X]. Here, E[|e|] is estimated instead, which for normal errors equals
 # sigma * sqrt(2/pi) ≈ 0.798 * sigma. This is internally consistent with the
@@ -1132,7 +1135,7 @@ if (SAVE_OUTPUTS) {
 }
 
 #-------------------------------------------------------------------------------
-### 4.1.1 Plot distribution density --------------------------------------------
+### 4.1.1 Plot distribution density - fertilizer -------------------------------
 #-------------------------------------------------------------------------------
 
 strike_vec <- premium_results$strike_price
@@ -1256,7 +1259,7 @@ if (SAVE_OUTPUTS) {
 }
 
 #-------------------------------------------------------------------------------
-### 4.2.1 Plot distribution density (wheat put option) -------------------------
+### 4.2.1 Plot distribution density - wheat ------------------------------------
 #-------------------------------------------------------------------------------
 
 strike_vec_w <- premium_results_w$strike_price
@@ -1278,7 +1281,8 @@ plot_original_w <- ggplot(data.frame(sim_w_p), aes(x = sim_w_p)) +
     x = "Simulated wheat prices and strike levels\n",
     y = "Density"
   ) +
-  theme_minimal()
+  theme_minimal() +
+  coord_cartesian(ylim = c(0, 0.06))
 
 # One plot per strike price (floored distribution)
 plot_list_w <- lapply(seq_along(strike_vec_w), function(i) {
@@ -1310,7 +1314,8 @@ plot_list_w <- lapply(seq_along(strike_vec_w), function(i) {
       fill = NULL
     ) +
     theme_minimal() +
-    theme(legend.position = "top")
+    theme(legend.position = "top") +
+    coord_cartesian(ylim = c(0, 0.06))
 })
 
 plot_list_w[[2]] <- plot_list_w[[2]] + theme(legend.position = "none")
@@ -1513,8 +1518,6 @@ for (t in 1:simulated_years) {
   simulated_yield[, t] <- predicted_yield + stochastic_error[, t]
 }
 
-# sim_w_p and output_selling_time extracted in Section 4 (above)
-
 #-------------------------------------------------------------------------------
 ### 5.2.2 Get price simulations and calculate profits --------------------------
 #-------------------------------------------------------------------------------
@@ -1533,6 +1536,7 @@ profit_nc <- (sim_w_p * simulated_yield) - (sim_f_p * CAN)
 profit_fc <- (sim_w_p * simulated_yield) - (sim_f_p_forward * CAN)
 
 # Calculate "adjusted contract" profits:
+
 # Initialize result data frame
 df_simulated_profit <- data.frame(
   nc = profit_nc,
@@ -1699,7 +1703,118 @@ if (SAVE_OUTPUTS) {
 }
 
 #-------------------------------------------------------------------------------
-### 5.3.3 Total profits under different contracts ------------------------------
+### 5.3.3 Wheat price received under different contracts -----------------------
+#-------------------------------------------------------------------------------
+
+base_row_wheat_prices <- tibble(
+  strike = NA,
+  mean = mean(sim_w_p),
+  median = median(sim_w_p),
+  sd = sd(sim_w_p),
+  min = min(sim_w_p),
+  max = max(sim_w_p)
+)
+
+base_row_wheat_forward_prices <- tibble(
+  strike = NA,
+  mean = mean(sim_w_p_forward),
+  median = median(sim_w_p_forward),
+  sd = sd(sim_w_p_forward),
+  min = min(sim_w_p_forward),
+  max = max(sim_w_p_forward)
+)
+
+stats_list <- list()
+
+for (i in 1:nrow(premium_results_w)) {
+  k_w <- premium_results_w$strike_price[i]
+
+  sim_w_p_adj_contr <- pmax(sim_w_p, k_w)
+
+  stats_list[[i]] <- tibble(
+    strike = k_w,
+    mean = mean(sim_w_p_adj_contr),
+    median = median(sim_w_p_adj_contr),
+    sd = sd(sim_w_p_adj_contr),
+    min = min(sim_w_p_adj_contr),
+    max = max(sim_w_p_adj_contr)
+  )
+}
+
+wheat_price_stats_table <- bind_rows(
+  base_row_wheat_prices,
+  base_row_wheat_forward_prices,
+  stats_list
+) |>
+  mutate(across(where(is.numeric), ~ round(., 3)))
+
+wheat_price_stats_table
+
+if (SAVE_OUTPUTS) {
+  write_csv(
+    wheat_price_stats_table,
+    "3_Outputs/Table_ResultsWheatPriceStats.csv"
+  )
+}
+
+#-------------------------------------------------------------------------------
+### 5.3.4 Total wheat revenue under different contracts ------------------------
+#-------------------------------------------------------------------------------
+
+base_row_wheat_revenue <- tibble(
+  strike = NA,
+  mean = mean(sim_w_p * simulated_yield),
+  median = median(sim_w_p * simulated_yield),
+  sd = sd(sim_w_p * simulated_yield),
+  min = min(sim_w_p * simulated_yield),
+  max = max(sim_w_p * simulated_yield)
+)
+
+base_row_wheat_forward_revenue <- tibble(
+  strike = NA,
+  mean = mean(sim_w_p_forward * simulated_yield),
+  median = median(sim_w_p_forward * simulated_yield),
+  sd = sd(sim_w_p_forward * simulated_yield),
+  min = min(sim_w_p_forward * simulated_yield),
+  max = max(sim_w_p_forward * simulated_yield)
+)
+
+stats_list <- list()
+
+for (i in 1:nrow(premium_results_w)) {
+  k_w <- premium_results_w$strike_price[i]
+  c_w <- premium_results_w$option_premium[i]
+
+  wheat_revenue <- pmax(sim_w_p, k_w) * simulated_yield - c_w * simulated_yield
+
+  stats_list[[i]] <- tibble(
+    strike = k_w,
+    mean = mean(wheat_revenue),
+    median = median(wheat_revenue),
+    sd = sd(wheat_revenue),
+    min = min(wheat_revenue),
+    max = max(wheat_revenue)
+  )
+}
+
+wheat_revenue_stats_table <- bind_rows(
+  base_row_wheat_revenue,
+  base_row_wheat_forward_revenue,
+  stats_list
+) |>
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+wheat_revenue_stats_table
+
+if (SAVE_OUTPUTS) {
+  write_csv(
+    wheat_revenue_stats_table,
+    "3_Outputs/Table_ResultsWheatRevenueStats.csv"
+  )
+}
+
+#-------------------------------------------------------------------------------
+### 5.3.5 Total profits under different contracts ------------------------------
 #-------------------------------------------------------------------------------
 
 summary_profits <- df_simulated_profit |>

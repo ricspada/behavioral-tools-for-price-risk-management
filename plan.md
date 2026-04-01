@@ -200,7 +200,7 @@ Add a second plot block (after the existing fertilizer diagram) for the wheat mi
 - [x] **S5.7** Confirm `compute_eut(df_simulated_profit, delta)` call requires no changes
 - [x] **S5.8** Confirm `compute_cpt(df_simulated_profit, ref_point_broad, ...)` call requires no changes
 - [x] **S5.9** Confirm `ref_point_broad <- mean(df_simulated_profit$fc)` remains the correct reference point
-- [ ] **S5.10** (Optional) Add subsection `### 5.1.4 Wheat revenue under different contracts` summary table, mirroring the fertilizer cost stats table
+- [x] **S5.10** Add subsections 5.3.3 (wheat price stats) and 5.3.4 (wheat revenue stats) summary tables, mirroring the fertilizer tables
 
 ### MainScript.R — Section 6
 
