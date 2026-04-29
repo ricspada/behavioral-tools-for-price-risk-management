@@ -6,20 +6,23 @@ library(robustbase)
 library(tidyverse)
 library(vars)
 library(tseries)
+library(forecast)
 library(patchwork)
 library(urca)
 library(moments)
 library(RColorBrewer)
+library(stargazer)
+library(strucchange)
 
 # Toggle to enable/disable writing output files (CSV tables, PDF figures)
-SAVE_OUTPUTS <- FALSE
+SAVE_OUTPUTS <- TRUE
 
 # Set seed for replicability
 set.seed(1234)
 
-# ===============================================================================
+# ==============================================================================
 # 1.0 NITROGEN-YIELD RELATIONSHIP ==============================================
-# ===============================================================================
+# ==============================================================================
 
 #-------------------------------------------------------------------------------
 ## 1.1 Get data from crop simulation model -------------------------------------
@@ -29,8 +32,12 @@ sim_yield <- read_csv("1_Data/EPIC.csv")
 
 sim_yield <- sim_yield |>
   filter(
-    CROP == "WWHT", # winter wheat only
-    SimUID == 52338 # grid location of interest (alternative: 52339)
+    # winter wheat only
+    CROP == "WWHT",
+    # grid location of interest (alternative: 52339)
+    SimUID == 52338,
+    # exlude alternative weather scenario pathways
+    WTH == "hist"
   ) |>
   mutate(
     YLD = YLD_DM / 0.88, # convert dry matter yield to economic yield (12% moisture content)
@@ -109,10 +116,6 @@ if (SAVE_OUTPUTS) {
   write_csv(sim_yield_summary, "3_Outputs/Table_YieldDescriptiveStatistics.csv")
 }
 
-#-------------------------------------------------------------------------------
-## 1.2 Just & Pope production function estimation ------------------------------
-#-------------------------------------------------------------------------------
-
 # summary statistics
 summary <- sim_yield |>
   group_by(FTN) |>
@@ -128,14 +131,17 @@ summary <- sim_yield |>
   mutate(across(where(is.numeric), ~ round(., 2)))
 
 summary
-# NOTE: FTN distribution is heavily unbalanced, majority of observations have
-# FTN = 180 (the BAU fertilization rate).
+# future wheater scenarios only simulate yield for FTN = 180, should we keep
+# or exlude them from the estimation? (the benefit is to introduce stochasticity)
 
 if (SAVE_OUTPUTS) {
   write_csv(summary, "3_Outputs/Table_YieldSummary.csv")
 }
 
-# Production function estimation
+#-------------------------------------------------------------------------------
+## 1.2 Just & Pope production function estimation ------------------------------
+#-------------------------------------------------------------------------------
+
 # Weather and rotation dummies are excluded because the downstream simulation
 # uses a fixed management scenario (rainfed, conventional tillage); their
 # effects are captured in the residual variance.
@@ -165,12 +171,7 @@ shapiro.test(sample(residuals, 500))
 skewness(residuals)
 
 # Variation function estimation
-# ISSUE: Use absolute residuals (not squared) as the dependent variable.
-# The standard Just & Pope approach regresses squared residuals to estimate
-# Var[Y|X]. Here, E[|e|] is estimated instead, which for normal errors equals
-# sigma * sqrt(2/pi) ≈ 0.798 * sigma. This is internally consistent with the
-# downstream rnorm(sd = predicted_sigma_yield) call (Section 5.0.1), but the
-# predicted sigma underestimates the true standard deviation by ~20%.
+# Using absolute residuals (not squared) as the dependent variable.
 variation_function <- lmrob(
   abs_residuals ~ sqrt(FTN) +
     FTN +
@@ -212,9 +213,9 @@ if (SAVE_OUTPUTS) {
 f_data <- read_csv("1_Data/FertilizerPrices.csv")
 f_data <- f_data[f_data[[2]] == "CAN", ]
 
-# keep data only for Bread wheat
+# keep data only for Bread wheat (alt. 'Feed_Wheat')
 w_data <- read_csv("1_Data/WheatPrices.csv")
-w_data <- w_data[w_data[[2]] == "Bread_Wheat", ] # alt. 'Feed_Wheat'
+w_data <- w_data[w_data[[2]] == "Bread_Wheat", ]
 
 # Check time ranges
 range(f_data$Date)
@@ -227,11 +228,13 @@ diff(w_data$Date)
 unique(diff(w_data$Date))
 
 # Merge datasets on common dates
+# Remove pre-2009 obs. (monthly up until that point)
+# Take log of prices
 dat <- inner_join(w_data, f_data, by = "Date") |>
   rename(w_p = Avg_Price.x, f_p = Avg_Price.y) |>
   dplyr::select(Date, w_p, f_p) |>
-  filter(Date >= as.Date("2009-01-01")) |> # Remove pre-2009 obs. (monthly up until that point)
-  mutate(w_p = log(w_p), f_p = log(f_p)) # Log prices
+  filter(Date >= as.Date("2009-01-01")) |>
+  mutate(w_p = log(w_p), f_p = log(f_p))
 
 range(dat$Date)
 diff(dat$Date)
@@ -245,6 +248,10 @@ sum(diff(dat$Date) == 14)
 # monday of the month (3 week gaps are introduced)
 
 # plot prices
+
+# consistent colors across plots
+colors <- c("darkblue", "darkgreen")
+
 price_plot <- ggplot(dat, aes(x = Date)) +
   geom_line(
     aes(y = f_p, color = "Calcium Ammonium Nitrate price"),
@@ -253,8 +260,8 @@ price_plot <- ggplot(dat, aes(x = Date)) +
   geom_line(aes(y = w_p, color = "Wheat price"), linewidth = 0.5) +
   scale_color_manual(
     values = c(
-      "Calcium Ammonium Nitrate price" = "blue",
-      "Wheat price" = "orange"
+      "Calcium Ammonium Nitrate price" = colors[1],
+      "Wheat price" = colors[2]
     )
   ) +
   labs(y = "Log of price (€/kg)", x = NULL, color = NULL) +
@@ -267,9 +274,83 @@ price_plot <- ggplot(dat, aes(x = Date)) +
 
 price_plot
 
-if (SAVE_OUTPUTS) {
-  ggsave("3_Outputs/Fig_Prices.pdf", plot = price_plot, width = 6, height = 4)
-}
+
+# ------------------------------------------------------------------------------
+## Outliers --------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+
+outliers_f <- tsoutliers(dat$f_p)
+outliers_w <- tsoutliers(dat$w_p)
+
+outliers_f$index
+outliers_f$replacements
+
+outliers_w$index
+outliers_w$replacements
+
+# plot identified outliers
+
+# flag outlier points
+dat$outlier_f <- FALSE
+dat$outlier_w <- FALSE
+dat$outlier_f[outliers_f$index] <- TRUE
+dat$outlier_w[outliers_w$index] <- TRUE
+
+# add to plot
+outliers_plot <- price_plot +
+  geom_point(
+    data = subset(dat, outlier_f),
+    aes(x = Date, y = f_p),
+    color = "red"
+  ) +
+  geom_point(
+    data = subset(dat, outlier_w),
+    aes(x = Date, y = w_p),
+    color = "red"
+  )
+
+outliers_plot
+
+# replace outliers
+dat$f_p[outliers_f$index] <- outliers_f$replacements
+dat$w_p[outliers_w$index] <- outliers_w$replacements
+
+# plot clean time series
+clean_price_plot <- ggplot(dat, aes(x = Date)) +
+  geom_line(
+    aes(y = f_p, color = "Calcium Ammonium Nitrate price"),
+    linewidth = 0.5
+  ) +
+  geom_line(aes(y = w_p, color = "Wheat price"), linewidth = 0.5) +
+  scale_color_manual(
+    values = c(
+      "Calcium Ammonium Nitrate price" = colors[1],
+      "Wheat price" = colors[2]
+    )
+  ) +
+  labs(y = "Log of price (€/kg)", x = NULL, color = NULL) +
+  theme_minimal() +
+  theme(
+    legend.position = c(0.1, 0.9),
+    legend.justification = c(0, 1),
+    legend.background = element_rect(fill = "white", color = "black")
+  )
+
+clean_price_plot
+
+clean_outliers_plot <- clean_price_plot +
+  geom_point(
+    data = subset(dat, outlier_f),
+    aes(x = Date, y = f_p),
+    color = "green"
+  ) +
+  geom_point(
+    data = subset(dat, outlier_w),
+    aes(x = Date, y = w_p),
+    color = "green"
+  )
+
+clean_outliers_plot
 
 #-------------------------------------------------------------------------------
 ## 2.2 Test for stationarity ---------------------------------------------------
@@ -317,9 +398,10 @@ pp_w <- pp.test(dat$w_p)
 # fail to reject the null of non-stationary => non-stationarity
 
 #-------------------------------------------------------------------------------
-### 2.2.1 Take first difference if not stationary ------------------------------
+### 2.2.1 Take first difference ------------------------------------------------
 #-------------------------------------------------------------------------------
 
+# taking the first difference as prices are non-stationary
 dif_dat <- dat |>
   mutate(
     w_p = c(NA, diff(w_p)),
@@ -349,31 +431,27 @@ pp_w_dif <- pp.test(dif_dat$w_p)
 ## 2.3 Plot --------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 
-plot_dif_w <- ggplot(dif_dat, aes(x = Date)) +
-  geom_line(aes(y = w_p), linewidth = 0.5, color = "orange") +
-  # geom_hline(yintercept = 0, linetype = "dashed") +
-  labs(y = "Wheat", x = NULL) +
-  theme_minimal()
-
 plot_dif_f <- ggplot(dif_dat, aes(x = Date)) +
-  geom_line(aes(y = f_p), linewidth = 0.5, color = "blue") +
-  # geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_line(aes(y = f_p), linewidth = 0.5, color = colors[1]) +
   labs(y = "Fertilizer", x = NULL) +
   theme_minimal()
 
-combined_dif_plots <- plot_dif_f / plot_dif_w
+plot_dif_w <- ggplot(dif_dat, aes(x = Date)) +
+  geom_line(aes(y = w_p), linewidth = 0.5, color = colors[2]) +
+  labs(y = "Wheat", x = NULL) +
+  theme_minimal()
+
+combined_dif_plots <- (plot_dif_f +
+  theme(axis.text.x = element_blank()) +
+  coord_cartesian(xlim = as.Date(c("2009-07-01", "2025-08-01")))) /
+  (plot_dif_w +
+    coord_cartesian(xlim = as.Date(c("2009-07-01", "2025-08-01"))))
 combined_dif_plots
 
-if (SAVE_OUTPUTS) {
-  ggsave(
-    "3_Outputs/Fig_DifferencedPrices.pdf",
-    plot = combined_dif_plots,
-    width = 8,
-    height = 6
-  )
-}
-
-combined_plots <- price_plot / combined_dif_plots
+combined_plots <- (clean_price_plot +
+  theme(axis.text.x = element_blank()) +
+  coord_cartesian(xlim = as.Date(c("2009-07-01", "2025-08-01")))) /
+  combined_dif_plots
 combined_plots
 
 if (SAVE_OUTPUTS) {
@@ -536,7 +614,7 @@ defl_w_p <- w_data |>
 #-------------------------------------------------------------------------------
 
 # Create regression variables
-dif_dat <- dif_dat |>
+var_dat <- dif_dat |>
   mutate(
     w_p1 = lag(w_p, 1), # wheat lags
     w_p2 = lag(w_p, 2),
@@ -546,102 +624,166 @@ dif_dat <- dif_dat |>
     f_p2 = lag(f_p, 2),
     f_p3 = lag(f_p, 3),
     f_p4 = lag(f_p, 4),
-    w_ps1 = w_p1^2, # squares
+    w_ps1 = w_p1^2, # squared lags
     f_ps1 = f_p1^2
   ) |>
   drop_na()
 
-vardat <- dif_dat |> dplyr::select(w_p, f_p)
+### 2.6.1 Baseline lag selection -----------------------------------------------
 
-# lag selection
-VARselect(vardat, lag.max = 4, type = "const")
-# either 1 or 2 lags suggested by info criteria
+VARselect(var_dat[, c("w_p", "f_p")], lag.max = 12, type = "const")
+# all criteria select p = 1
 
-# estimate VAR(1)
-var1 <- VAR(vardat, p = 1)
+### 2.6.2 VAR(1) baseline diagnostics -----------------------------------------
+
+var1 <- VAR(var_dat[, c("w_p", "f_p")], p = 1)
 summary(var1)
+
 serial.test(var1, lags.pt = 12, type = "PT.asymptotic")
-# Strong rejection of the null hypothesis - there is significant serial correlation
+serial.test(var1, lags.pt = 12, type = "BG")
+# BG test p = 0.04: evidence of serial correlation at 5%
 
-# estimate VAR(2)
-var2 <- VAR(vardat, p = 2)
-summary(var2)
-serial.test(var2, lags.pt = 12, type = "PT.asymptotic")
+plot(stability(var1))
+plot(stability(var1, type = "fluctuation"))
+# fluctuation test suggests instability -> check for structural breaks
 
-# estimate VAR(3)
-var3 <- VAR(vardat, p = 3)
-summary(var3)
-serial.test(var3, lags.pt = 12, type = "PT.asymptotic")
-# still strong rejection of the null hypothesis - there is significant serial correlation
+### 2.6.3 Structural break analysis --------------------------------------------
 
-# test for volatility clustering
+bp_fp <- breakpoints(f_p ~ f_p1 + w_p1, data = var_dat)
+bp_wp <- breakpoints(w_p ~ f_p1 + w_p1, data = var_dat)
+summary(bp_fp)
+summary(bp_wp)
+plot(bp_fp)
+plot(bp_wp)
+# 2 structural breaks for f_p at obs 198 (~2017-04) and 288 (~2021-01)
+# no break for w_p
+
+### 2.6.4 ARCH test ------------------------------------------------------------
+
 arch.test(var1)
-arch.test(var2)
-# VAR models assume constant variance - ARCH effects present
+# ARCH effects present -> QVAR approach
 
-# create time trends and seasonal dummies
-dif_dat <- dif_dat |>
+### 2.6.5 Create exogenous variables -------------------------------------------
+
+var_dat <- var_dat |>
   mutate(
-    tt = 1:n(), # general time trend
+    tt = 1:n(),
     tt1 = ifelse(
       Date >= as.Date("2021-09-01"),
       row_number() - which.min(Date < as.Date("2021-09-01")),
       0
-    ), # time trend post Sep 2021 (change of data)
-
+    ),
     year = as.numeric(format(Date, "%Y")),
     month = as.numeric(format(Date, "%m")),
-    day = as.numeric(format(Date, "%d")),
-
-    # quarterly dummies
     Q1 = ifelse(month %in% c(1, 2, 3), 1, 0),
     Q2 = ifelse(month %in% c(4, 5, 6), 1, 0),
     Q3 = ifelse(month %in% c(7, 8, 9), 1, 0),
     Q4 = ifelse(month %in% c(10, 11, 12), 1, 0),
-
-    # covid/ukraine war dummy
-    D = ifelse(
-      Date >= as.Date("2021-09-01") & Date <= as.Date("2023-09-01"),
-      1,
-      0
-    )
+    D2 = ifelse(seq_len(nrow(var_dat)) >= 288, 1, 0),
+    D_shock = ifelse(seq_len(nrow(var_dat)) %in% 285:315, 1, 0)
   )
 
-# select lag with exogenous variables
-VARselect(vardat, lag.max = 4, type = "const")
-VARselect(vardat, lag.max = 12, exogen = cbind(dif_dat[, c("w_ps1", "f_ps1")]))
-VARselect(
-  vardat,
-  lag.max = 4,
-  exogen = cbind(dif_dat[, c("w_ps1", "f_ps1", "tt")])
+### 2.6.6 Models comparison -----------------------------------------
+
+# endogenous variables
+vardat_endo <- var_dat[, c("w_p", "f_p")]
+
+# helper to extract information criteria and diagnostics
+get_var_ic <- function(mod) {
+  aic <- AIC(mod$varresult$w_p) + AIC(mod$varresult$f_p)
+  bic <- BIC(mod$varresult$w_p) + BIC(mod$varresult$f_p)
+  bg <- serial.test(mod, lags.pt = 12, type = "BG")
+  c(AIC = aic, BIC = bic, BG_pval = unname(bg$serial$p.value))
+}
+
+# estimate candidate models
+var_m1 <- VAR(vardat_endo, p = 1)
+var_m2 <- VAR(
+  vardat_endo,
+  p = 1,
+  exogen = as.matrix(var_dat[, c("w_ps1", "f_ps1")])
 )
-VARselect(
-  vardat,
-  lag.max = 4,
-  exogen = cbind(dif_dat[, c("w_ps1", "f_ps1", "tt", "tt1")])
+var_m3 <- VAR(
+  vardat_endo,
+  p = 1,
+  exogen = as.matrix(var_dat[, "D2", drop = FALSE])
 )
-VARselect(
-  vardat,
-  lag.max = 4,
-  exogen = cbind(dif_dat[, c("w_ps1", "f_ps1", "tt", "tt1", "Q1", "Q2", "Q3")])
+var_m4 <- VAR(
+  vardat_endo,
+  p = 1,
+  exogen = as.matrix(var_dat[, "D_shock", drop = FALSE])
 )
-VARselect(
-  vardat,
-  lag.max = 4,
-  exogen = cbind(dif_dat[, c(
-    "w_ps1",
-    "f_ps1",
-    "tt",
-    "tt1",
-    "Q1",
-    "Q2",
-    "Q3",
-    "D"
-  )])
+var_m5 <- VAR(
+  vardat_endo,
+  p = 1,
+  exogen = as.matrix(var_dat[, c("Q1", "Q2", "Q3")])
+)
+var_m6 <- VAR(
+  vardat_endo,
+  p = 1,
+  exogen = as.matrix(var_dat[, c("w_ps1", "f_ps1", "D_shock")])
+)
+var_m7 <- VAR(
+  vardat_endo,
+  p = 1,
+  exogen = as.matrix(var_dat[, c("w_ps1", "f_ps1", "Q1", "Q2", "Q3")])
+)
+var_m8 <- VAR(vardat_endo, p = 1, exogen = as.matrix(var_dat[, c("tt", "tt1")]))
+var_m9 <- VAR(vardat_endo, p = 2)
+var_m10 <- VAR(
+  vardat_endo,
+  p = 2,
+  exogen = as.matrix(var_dat[, c("w_ps1", "f_ps1")])
+)
+var_m11 <- VAR(
+  vardat_endo,
+  p = 2,
+  exogen = as.matrix(var_dat[, "D2", drop = FALSE])
+)
+var_m12 <- VAR(
+  vardat_endo,
+  p = 2,
+  exogen = as.matrix(var_dat[, c("w_ps1", "f_ps1", "Q1", "Q2", "Q3")])
 )
 
-# best model according to AIC and BIC is p=1/2 with squared terms
-# we stay with the linear model as the squared specification does not produce a stable price simulation
+model_list <- list(
+  "VAR(1)" = var_m1,
+  "VAR(1) + sq" = var_m2,
+  "VAR(1) + D2" = var_m3,
+  "VAR(1) + D_shock" = var_m4,
+  "VAR(1) + Q" = var_m5,
+  "VAR(1) + sq + D_shock" = var_m6,
+  "VAR(1) + sq + Q" = var_m7,
+  "VAR(1) + tt" = var_m8,
+  "VAR(2)" = var_m9,
+  "VAR(2) + sq" = var_m10,
+  "VAR(2) + D2" = var_m11,
+  "VAR(2) + sq + Q" = var_m12
+)
+
+var_comparison <- as.data.frame(t(sapply(model_list, get_var_ic)))
+var_comparison$Model <- rownames(var_comparison)
+var_comparison <- var_comparison[, c("Model", "AIC", "BIC", "BG_pval")]
+rownames(var_comparison) <- NULL
+
+var_comparison
+
+# Best by BIC: VAR(1) baseline
+#
+# Squared lags (w_p1^2, f_p1^2) consistently improve fit and remove
+# serial correlation
+#
+# Selected specification for QVAR:
+# VAR(1)
+# VAR(1) + squared lags
+
+if (SAVE_OUTPUTS) {
+  write.csv(
+    var_comparison,
+    "3_Outputs/Table_VARComparison.csv",
+    row.names = FALSE
+  )
+}
 
 #-------------------------------------------------------------------------------
 ## 2.7 QVAR estimation ---------------------------------------------------------
@@ -652,16 +794,16 @@ mf <- f_p ~ f_p1 + w_p1
 mw <- w_p ~ f_p1 + w_p1
 
 # var estimation
-var_f <- lm(mf, data = dif_dat)
+var_f <- lm(mf, data = var_dat)
 summary(var_f)
-var_w <- lm(mw, data = dif_dat)
+var_w <- lm(mw, data = var_dat)
 summary(var_w)
 
 # estimate QVARs for table
 taus_sparse <- c(.1, .3, .5, .7, .9)
 
-qvar_f <- rq(mf, tau = taus_sparse, data = dif_dat)
-qvar_w <- rq(mw, tau = taus_sparse, data = dif_dat)
+qvar_f <- rq(mf, tau = taus_sparse, data = var_dat)
+qvar_w <- rq(mw, tau = taus_sparse, data = var_dat)
 sum_qvar_f <- summary(qvar_f, se = "boot", brmethod = "xy")
 sum_qvar_w <- summary(qvar_w, se = "boot", brmethod = "xy")
 sum_qvar_f
@@ -670,23 +812,25 @@ sum_qvar_w
 # Calculate pseudo R^2s for table (both wheat and fertilizer)
 psu_r2s_w <- numeric(length(taus_sparse))
 psu_r2s_f <- numeric(length(taus_sparse))
-rho <- function(u, tau) sum(u * (tau - (u < 0))) # rho calc from JP code
+
+# rho calculation
+rho <- function(u, tau) sum(u * (tau - (u < 0)))
 
 for (i in seq_along(taus_sparse)) {
   tau <- taus_sparse[i]
 
   # wheat
-  fit_w <- rq(mw, tau = tau, data = dif_dat)
-  y_w <- dif_dat$w_p
-  yhat_w <- predict(fit_w, newdata = dif_dat)
+  fit_w <- rq(mw, tau = tau, data = var_dat)
+  y_w <- var_dat$w_p
+  yhat_w <- predict(fit_w, newdata = var_dat)
   rho_m_w <- rho(y_w - yhat_w, tau)
   rho0_w <- rho(y_w - quantile(y_w, probs = tau), tau)
   psu_r2s_w[i] <- 1 - rho_m_w / rho0_w
 
   # fertilizer
-  fit_f <- rq(mf, tau = tau, data = dif_dat)
-  y_f <- dif_dat$f_p
-  yhat_f <- predict(fit_f, newdata = dif_dat)
+  fit_f <- rq(mf, tau = tau, data = var_dat)
+  y_f <- var_dat$f_p
+  yhat_f <- predict(fit_f, newdata = var_dat)
   rho_m_f <- rho(y_f - yhat_f, tau)
   rho0_f <- rho(y_f - quantile(y_f, probs = tau), tau)
   psu_r2s_f[i] <- 1 - rho_m_f / rho0_f
@@ -695,15 +839,18 @@ for (i in seq_along(taus_sparse)) {
 round(psu_r2s_f, 3)
 round(psu_r2s_w, 3)
 
-# make table
+### create QVAR tables ---------------------------------------------------
+
+# Note: substitute QVAR R2 with pseudo R2 derived above
+
 model_list_f <- list("VAR" = var_f)
 for (tau in taus_sparse) {
-  model_list_f[[paste0("", tau)]] <- rq(mf, tau = tau, data = dif_dat)
+  model_list_f[[paste0("", tau)]] <- rq(mf, tau = tau, data = var_dat)
 }
 
 model_list_w <- list("VAR" = var_w)
 for (tau in taus_sparse) {
-  model_list_w[[paste0("", tau)]] <- rq(mw, tau = tau, data = dif_dat)
+  model_list_w[[paste0("", tau)]] <- rq(mw, tau = tau, data = var_dat)
 }
 
 if (SAVE_OUTPUTS) {
@@ -722,25 +869,25 @@ if (SAVE_OUTPUTS) {
   )
 }
 
-# full QVAR estimation
+## full QVAR estimation
 taus_dense <- seq(0.01, 0.99, by = 0.01)
-fit_f <- rq(mf, tau = taus_dense, data = dif_dat)
-fit_w <- rq(mw, tau = taus_dense, data = dif_dat)
+fit_f <- rq(mf, tau = taus_dense, data = var_dat)
+fit_w <- rq(mw, tau = taus_dense, data = var_dat)
 
-# save the coefficients
+# save the coefficients for the copula
 coeff_w <- fit_w$coeff
 coeff_f <- fit_f$coeff
 
 # Get independent variables
-w_p <- dif_dat$w_p
-w_p1 <- dif_dat$w_p1
+w_p <- var_dat$w_p
+w_p1 <- var_dat$w_p1
 
-f_p <- dif_dat$f_p
-f_p1 <- dif_dat$f_p1
+f_p <- var_dat$f_p
+f_p1 <- var_dat$f_p1
 
 X <- cbind(1, f_p1, w_p1)
 
-# Inverse distributions
+# Get inverse distributions to build the copula
 y_w <- X %*% coeff_w
 y_w <- t(apply(y_w, 1, cummax))
 
@@ -752,12 +899,15 @@ y_f <- t(apply(y_f, 1, cummax))
 #-------------------------------------------------------------------------------
 
 # get number of rows
-n <- nrow(vardat)
+n <- nrow(var_dat)
 
 # initialize arrays
 F_w <- array(0, dim = c(n, 1))
 F_f <- array(0, dim = c(n, 1))
 
+# for each observation, finds the conditional quantile the realized price
+# change fall closest to. The result F_w[ii] is a value in [0.01, 0.99]
+# used to build the copula.
 for (ii in 1:n) {
   F_w[ii] <- taus_dense[min(which(
     min(abs(w_p[ii] - y_w[ii, ])) == abs(w_p[ii] - y_w[ii, ])
@@ -770,23 +920,35 @@ for (ii in 1:n) {
 C <- F_w ~ F_f
 summary(lm(C))
 
+# copula table (sparse quantiles with bootstrap SEs)
 rC <- rq(C, tau = taus_sparse)
 sum_rC <- summary(rC, se = "boot", brmethod = "xy")
 sum_rC
 
+# full copula (dense quantiles for simulation)
 rC_full <- rq(C, tau = taus_dense)
 coeff_rC <- rC_full$coeff
 
+# plot copula coefficients across quantiles
 plot(
   taus_dense,
   coeff_rC[2, ],
   type = "l",
   col = "steelblue",
   lwd = 2,
-  xlab = "tau of fertilizer price",
-  ylab = "slope"
+  xlab = "quantile",
+  ylab = "coefficient",
+  main = "Copula: F_w | F_f"
 )
+lines(taus_dense, coeff_rC[3, ], col = "tomato", lwd = 2, lty = 2)
 abline(h = 0, lty = 2)
+legend(
+  "topleft",
+  c("F_f", "(F_f - 0.5)^2"),
+  col = c("steelblue", "tomato"),
+  lwd = 2,
+  lty = c(1, 2)
+)
 
 #-------------------------------------------------------------------------------
 ## 2.9 Dynamic stability analysis ----------------------------------------------
@@ -807,7 +969,7 @@ qMRev <- array(0, dim = c(3, ntau, ntau))
 for (i in 1:ntau) {
   # Fertilizer
   rqbs[1, i, , ] <- boot.rq(
-    y = dif_dat$f_p,
+    y = var_dat$f_p,
     x = X,
     tau = taus_sparse[i],
     R = bootreps
@@ -815,7 +977,7 @@ for (i in 1:ntau) {
 
   # Wheat
   rqbs[2, i, , ] <- boot.rq(
-    y = dif_dat$w_p,
+    y = var_dat$w_p,
     x = X,
     tau = taus_sparse[i],
     R = bootreps
@@ -875,7 +1037,7 @@ Ys_changes[2, 1, ] <- dif_dat$w_p[n_dif] # last observed wheat change at t=1
 Ys_levels[1, 1, ] <- dat$f_p[n_lev] # last observed fertilizer level
 Ys_levels[2, 1, ] <- dat$w_p[n_lev] # last observed wheat level
 
-# QVAR Simulation
+# Copula Simulation
 for (it in 2:Nt) {
   for (is in 1:Ns) {
     f_change1 <- Ys_changes[1, it - 1, is]
@@ -1095,13 +1257,16 @@ sim_f_p <- array(dim = c(Ns, simulated_years))
 
 for (t in 1:simulated_years) {
   time <- exercise_time[t]
-  sim_f_p[, t] <- exp(as.vector(Ys_levels[1, time, ])) / 1000
+  sim_f_p[, t] <- exp(as.vector(Ys_levels[1, time, ]))
 }
+
 sim_f_p_df <- data.frame(sim_f_p)
 
 # get simulated wheat prices (t=13, early July)
 output_selling_time <- 13 + (0:(simulated_years - 1)) * obs_per_year
+
 sim_w_p <- array(dim = c(Ns, simulated_years))
+
 for (t in 1:simulated_years) {
   sim_w_p[, t] <- exp(as.vector(Ys_levels[2, output_selling_time[t], ]))
 }
@@ -1158,8 +1323,7 @@ plot_original <- ggplot(data.frame(sim_f_p), aes(x = sim_f_p)) +
     x = "Simulated prices and strike levels\n",
     y = "Density"
   ) +
-  theme_minimal() +
-  coord_cartesian(ylim = c(0, 80), xlim = c(0.28, 0.43))
+  theme_minimal()
 
 # one plot per strike price (capped distribution)
 plot_list <- lapply(seq_along(strike_vec), function(i) {
@@ -1191,8 +1355,7 @@ plot_list <- lapply(seq_along(strike_vec), function(i) {
       fill = NULL
     ) +
     theme_minimal() +
-    theme(legend.position = "top") +
-    coord_cartesian(ylim = c(0, 80), xlim = c(0.28, 0.43))
+    theme(legend.position = "top")
 })
 
 plot_list[[2]] <- plot_list[[2]] + theme(legend.position = "none")
@@ -1200,7 +1363,7 @@ plot_list[[3]] <- plot_list[[3]] +
   labs(y = "Density\n") +
   theme(legend.position = "none")
 plot_list[[4]] <- plot_list[[4]] +
-  labs(x = paste("Strike =", round(strike_vec[4], 3), "\n\nPrice (eur/kg)")) +
+  labs(x = paste("Strike =", round(strike_vec[4], 3), "\n\nPrice (eur/t)")) +
   theme(legend.position = "none")
 plot_list[[5]] <- plot_list[[5]] + theme(legend.position = "none")
 
@@ -1468,15 +1631,92 @@ compute_cpt <- function(
   bind_rows(results_list)
 }
 
+# Compute alpha-EU certainty equivalents under ambiguity (Ghirardato et al. 2004)
+# Binary state space: "high" (>= ref) and "low" (< ref) profits.
+# CARA utility: U(x) = -exp(-delta * x)
+# Belief bounds: [P_min, P_max] for probability of high state.
+# Since E[U|high] > E[U|low], E^P[U] is increasing in P, so
+#   min E^P[U] is at P_min, max E^P[U] is at P_max.
+compute_alpha_eu <- function(
+  profit_df,
+  ref_point,
+  delta_values,
+  alpha_values,
+  p_intervals
+) {
+  target_cols <- colnames(profit_df)
+  results_list <- list()
+  idx <- 0L
+
+  for (d in delta_values) {
+    for (col_name in target_cols) {
+      profits <- profit_df[[col_name]]
+
+      high <- profits[profits >= ref_point]
+      low <- profits[profits < ref_point]
+
+      # Expected CARA utility within each state
+      eu_high <- if (length(high) > 0) mean(-exp(-d * high)) else NA
+      eu_low <- if (length(low) > 0) mean(-exp(-d * low)) else NA
+
+      # If all observations fall in one state, E^P[U] is constant in P
+      # and alpha-EU collapses to standard EU
+      if (is.na(eu_high) || is.na(eu_low)) {
+        eu_single <- if (!is.na(eu_high)) eu_high else eu_low
+        ce_single <- -log(-eu_single) / d
+
+        for (a in alpha_values) {
+          for (pi in p_intervals) {
+            idx <- idx + 1L
+            results_list[[idx]] <- data.frame(
+              Variable = col_name,
+              Delta = d,
+              Alpha = a,
+              P_interval = paste0("[", pi[1], ", ", pi[2], "]"),
+              AlphaEU_CE = ce_single
+            )
+          }
+        }
+        next
+      }
+
+      for (a in alpha_values) {
+        for (pi in p_intervals) {
+          p_min <- pi[1]
+          p_max <- pi[2]
+
+          eu_at_pmin <- p_min * eu_high + (1 - p_min) * eu_low
+          eu_at_pmax <- p_max * eu_high + (1 - p_max) * eu_low
+
+          alpha_eu_val <- a * eu_at_pmin + (1 - a) * eu_at_pmax
+
+          ce <- -log(-alpha_eu_val) / d
+
+          idx <- idx + 1L
+          results_list[[idx]] <- data.frame(
+            Variable = col_name,
+            Delta = d,
+            Alpha = a,
+            P_interval = paste0("[", pi[1], ", ", pi[2], "]"),
+            AlphaEU_CE = ce
+          )
+        }
+      }
+    }
+  }
+  bind_rows(results_list)
+}
+
 # ===============================================================================
 ## 5.2 Broad framing ============================================================
 # ===============================================================================
 
 # Parameters
-# NOTE: N = 200 interpolates between FTN = 180 (BAU) and 250 in the EPIC data.
-# The sqrt(FTN) + FTN functional form provides smooth interpolation.
-N <- 200 # amount of N applied
-CAN <- N / 0.27 # amount of CAN (27% N)
+
+# kg of N/ha applied
+N <- 200
+# tonnes of CAN/ha (contains 27% N)
+CAN <- N / 0.27 / 1000
 
 #-------------------------------------------------------------------------------
 ### 5.2.1 Simulate stochastic yields -------------------------------------------
@@ -1517,6 +1757,16 @@ simulated_yield <- array(dim = c(Ns, simulated_years))
 for (t in 1:simulated_years) {
   simulated_yield[, t] <- predicted_yield + stochastic_error[, t]
 }
+
+# plot simulated yields
+df_sim_yield <- data.frame(yield = simulated_yield[, 1])
+
+sim_yield_plot <- ggplot(df_sim_yield, aes(x = yield)) +
+  geom_histogram() +
+  theme_minimal() +
+  labs(x = "Simulated yield (t/ha)", y = "Density")
+
+sim_yield_plot
 
 #-------------------------------------------------------------------------------
 ### 5.2.2 Get price simulations and calculate profits --------------------------
@@ -1989,6 +2239,45 @@ final_cpt_table
 
 if (SAVE_OUTPUTS) {
   write_csv(final_cpt_table, "3_Outputs/Table_Results_CPT_BroadFraming.csv")
+}
+
+#-------------------------------------------------------------------------------
+## 5.6 Alpha-EU under broad framing (Ghirardato et al. 2004) -------------------
+#-------------------------------------------------------------------------------
+
+# Ambiguity aversion parameter (0 = full ambiguity loving, 1 = full aversion)
+alpha_amb <- c(0.1, 0.5, 0.9)
+
+# Risk aversion (CARA): same grid as EUT
+delta_amb <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005)
+
+# Belief bounds on probability of the "high" state (profits >= ref point)
+p_intervals <- list(c(0.3, 0.7), c(0.4, 0.6), c(0.45, 0.55))
+
+alpha_eu_results <- compute_alpha_eu(
+  df_simulated_profit,
+  ref_point_broad,
+  delta_amb,
+  alpha_amb,
+  p_intervals
+)
+
+# Pivot to wide format: one row per (Delta, Alpha, P_interval), columns = scenarios
+alpha_eu_table <- alpha_eu_results |>
+  pivot_wider(
+    names_from = Variable,
+    values_from = AlphaEU_CE,
+    names_prefix = "CE_"
+  ) |>
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+alpha_eu_table
+
+if (SAVE_OUTPUTS) {
+  write_csv(
+    alpha_eu_table,
+    "3_Outputs/Table_Results_AlphaEU_BroadFraming.csv"
+  )
 }
 
 # ===============================================================================
