@@ -217,19 +217,8 @@ f_data <- f_data[f_data[[2]] == "CAN", ]
 w_data <- read_csv("1_Data/WheatPrices.csv")
 w_data <- w_data[w_data[[2]] == "Bread_Wheat", ]
 
-# Check time ranges
-range(f_data$Date)
-range(w_data$Date)
-
-# Check time intervals (see if regularly spaced)
-diff(f_data$Date)
-unique(diff(f_data$Date))
-diff(w_data$Date)
-unique(diff(w_data$Date))
-
 # Merge datasets on common dates
 # Remove pre-2009 obs. (monthly up until that point)
-# Take log of prices
 dat <- inner_join(w_data, f_data, by = "Date") |>
   rename(w_p = Avg_Price.x, f_p = Avg_Price.y) |>
   dplyr::select(Date, w_p, f_p) |>
@@ -274,6 +263,7 @@ price_plot <- ggplot(dat, aes(x = Date)) +
 
 price_plot
 
+# clear outlier in wheat prices, formally checkin for outliers
 
 # ------------------------------------------------------------------------------
 ## Outliers --------------------------------------------------------------------
@@ -288,15 +278,13 @@ outliers_f$replacements
 outliers_w$index
 outliers_w$replacements
 
-# plot identified outliers
-
 # flag outlier points
 dat$outlier_f <- FALSE
-dat$outlier_w <- FALSE
 dat$outlier_f[outliers_f$index] <- TRUE
+dat$outlier_w <- FALSE
 dat$outlier_w[outliers_w$index] <- TRUE
 
-# add to plot
+# plot identified outliers
 outliers_plot <- price_plot +
   geom_point(
     data = subset(dat, outlier_f),
@@ -311,8 +299,8 @@ outliers_plot <- price_plot +
 
 outliers_plot
 
-# replace outliers
-dat$f_p[outliers_f$index] <- outliers_f$replacements
+# identified outliers for fertilizer occour after price shocks thus are not removed
+# replacing only wheat price outlier
 dat$w_p[outliers_w$index] <- outliers_w$replacements
 
 # plot clean time series
@@ -338,19 +326,6 @@ clean_price_plot <- ggplot(dat, aes(x = Date)) +
 
 clean_price_plot
 
-clean_outliers_plot <- clean_price_plot +
-  geom_point(
-    data = subset(dat, outlier_f),
-    aes(x = Date, y = f_p),
-    color = "green"
-  ) +
-  geom_point(
-    data = subset(dat, outlier_w),
-    aes(x = Date, y = w_p),
-    color = "green"
-  )
-
-clean_outliers_plot
 
 #-------------------------------------------------------------------------------
 ## 2.2 Test for stationarity ---------------------------------------------------
@@ -917,6 +892,7 @@ for (ii in 1:n) {
   ))]
 }
 
+# conditional copula
 C <- F_w ~ F_f
 summary(lm(C))
 
@@ -940,15 +916,7 @@ plot(
   ylab = "coefficient",
   main = "Copula: F_w | F_f"
 )
-lines(taus_dense, coeff_rC[3, ], col = "tomato", lwd = 2, lty = 2)
 abline(h = 0, lty = 2)
-legend(
-  "topleft",
-  c("F_f", "(F_f - 0.5)^2"),
-  col = c("steelblue", "tomato"),
-  lwd = 2,
-  lty = c(1, 2)
-)
 
 #-------------------------------------------------------------------------------
 ## 2.9 Dynamic stability analysis ----------------------------------------------
@@ -1007,9 +975,9 @@ for (f in 1:ntau) {
 t.test(MRev[, 3, 3], mu = 1)
 
 
-# ===============================================================================
+# ==============================================================================
 # 3.0 Price paths simulation ===================================================
-# ===============================================================================
+# ==============================================================================
 
 set.seed(1234)
 
@@ -1046,11 +1014,9 @@ for (it in 2:Nt) {
     Xfi <- cbind(1, f_change1, w_change1) # matches mf: intercept, f_p1, w_p1
     Xwi <- cbind(1, f_change1, w_change1) # matches mw: intercept, f_p1, w_p1
 
-    # Draw copula-linked quantiles
+    # Draw independent marginal quantiles
     qi_f <- sample(1:99, 1)
-    tau_f <- qi_f / 100
-    tau_w_cond <- coeff_rC[1, qi_f] + coeff_rC[2, qi_f] * tau_f
-    qi_w <- max(1, min(99, round(tau_w_cond * 100)))
+    qi_w <- sample(1:99, 1)
 
     yf_change <- Xfi %*% coeff_f[, qi_f]
     yw_change <- Xwi %*% coeff_w[, qi_w]
@@ -1514,18 +1480,12 @@ if (SAVE_OUTPUTS) {
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-## 5.1 Functions for EUT and CPT calculations ----------------------------------
+## 5.1 Functions for EUT, CPT, and Ambiguity calculations ----------------------
 # ------------------------------------------------------------------------------
 
-# Value function (Tversky & Kahneman 1992)
-v <- function(x, a, l, ref) {
-  ifelse(x >= ref, (x - ref)^a, -l * (-(x - ref))^a)
-}
-
-# Probability weighting function (Prelec 1998)
-weighting_function <- function(p, g) {
-  exp(-(-log(p))^g)
-}
+# ------------------------------------------------------------------------------
+## 5.1.1 EUT -------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 # Compute EUT certainty equivalents using Mean-Variance approximation
 compute_eut <- function(profit_df, delta_values) {
@@ -1549,6 +1509,20 @@ compute_eut <- function(profit_df, delta_values) {
     }
   }
   bind_rows(results_list)
+}
+
+# ------------------------------------------------------------------------------
+## 5.1.2 CPT -------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+
+# Value function (Tversky & Kahneman 1992)
+v <- function(x, a, l, ref) {
+  ifelse(x >= ref, (x - ref)^a, -l * (-(x - ref))^a)
+}
+
+# Probability weighting function (Prelec 1998)
+weighting_function <- function(p, g) {
+  exp(-(-log(p))^g)
 }
 
 # Compute CPT values for all parameter combinations
@@ -1631,12 +1605,14 @@ compute_cpt <- function(
   bind_rows(results_list)
 }
 
-# Compute alpha-EU certainty equivalents under ambiguity (Ghirardato et al. 2004)
-# Binary state space: "high" (>= ref) and "low" (< ref) profits.
-# CARA utility: U(x) = -exp(-delta * x)
-# Belief bounds: [P_min, P_max] for probability of high state.
-# Since E[U|high] > E[U|low], E^P[U] is increasing in P, so
-#   min E^P[U] is at P_min, max E^P[U] is at P_max.
+# ------------------------------------------------------------------------------
+## 5.1.3 Ambiguity -------------------------------------------------------------
+# ------------------------------------------------------------------------------
+
+# Compute alpha-EU certainty equivalents under ambiguity.
+# p_intervals refer to Pr(low), i.e. the probability of the adverse state
+# (profits < ref_point). Intervals should be centered on the empirical
+# frequency of that state.
 compute_alpha_eu <- function(
   profit_df,
   ref_point,
@@ -1685,10 +1661,13 @@ compute_alpha_eu <- function(
           p_min <- pi[1]
           p_max <- pi[2]
 
-          eu_at_pmin <- p_min * eu_high + (1 - p_min) * eu_low
-          eu_at_pmax <- p_max * eu_high + (1 - p_max) * eu_low
+          # p refers to Pr(low): EU is decreasing in p, so
+          # p_max gives min EU (worst case), p_min gives max EU (best case)
+          eu_at_pmin <- p_min * eu_low + (1 - p_min) * eu_high
+          eu_at_pmax <- p_max * eu_low + (1 - p_max) * eu_high
 
-          alpha_eu_val <- a * eu_at_pmin + (1 - a) * eu_at_pmax
+          # alpha weights the pessimistic (min) prior
+          alpha_eu_val <- a * eu_at_pmax + (1 - a) * eu_at_pmin
 
           ce <- -log(-alpha_eu_val) / d
 
@@ -2242,17 +2221,25 @@ if (SAVE_OUTPUTS) {
 }
 
 #-------------------------------------------------------------------------------
-## 5.6 Alpha-EU under broad framing (Ghirardato et al. 2004) -------------------
+## 5.6 Alpha-EU under broad framing --------------------------------------------
 #-------------------------------------------------------------------------------
 
 # Ambiguity aversion parameter (0 = full ambiguity loving, 1 = full aversion)
 alpha_amb <- c(0.1, 0.5, 0.9)
 
-# Risk aversion (CARA): same grid as EUT
+# Risk aversion (CARA)
 delta_amb <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005)
 
-# Belief bounds on probability of the "high" state (profits >= ref point)
-p_intervals <- list(c(0.3, 0.7), c(0.4, 0.6), c(0.45, 0.55))
+# Empirical probability of the adverse state (profits < ref point)
+p_hat <- mean(df_simulated_profit$fc < ref_point_broad)
+
+# Belief bounds on Pr(low) centered on the empirical frequency
+# Three levels of ambiguity: high (±0.20), medium (±0.10), low (±0.05)
+p_intervals <- list(
+  c(max(p_hat - 0.20, 0), min(p_hat + 0.20, 1)),
+  c(max(p_hat - 0.10, 0), min(p_hat + 0.10, 1)),
+  c(max(p_hat - 0.05, 0), min(p_hat + 0.05, 1))
+)
 
 alpha_eu_results <- compute_alpha_eu(
   df_simulated_profit,
@@ -2506,5 +2493,45 @@ if (SAVE_OUTPUTS) {
   write_csv(
     final_cpt_narrowframing,
     "3_Outputs/Table_Results_CPT_NarrowFraming.csv"
+  )
+}
+
+#-------------------------------------------------------------------------------
+## 6.3 Alpha-EU under narrow framing -------------------------------------------
+#-------------------------------------------------------------------------------
+
+# Empirical probability of the adverse state (payoff < 0) under forward contract
+p_hat_nf <- mean(df_profit_narrowframing$fc < ref_point_narrow)
+
+# Belief bounds on Pr(low) centered on empirical frequency
+p_intervals_nf <- list(
+  c(max(p_hat_nf - 0.20, 0), min(p_hat_nf + 0.20, 1)),
+  c(max(p_hat_nf - 0.10, 0), min(p_hat_nf + 0.10, 1)),
+  c(max(p_hat_nf - 0.05, 0), min(p_hat_nf + 0.05, 1))
+)
+
+alpha_eu_results_nf <- compute_alpha_eu(
+  df_profit_narrowframing,
+  ref_point_narrow,
+  delta_amb,
+  alpha_amb,
+  p_intervals_nf
+)
+
+# Pivot to wide format: one row per (Delta, Alpha, P_interval), columns = scenarios
+alpha_eu_table_nf <- alpha_eu_results_nf |>
+  pivot_wider(
+    names_from = Variable,
+    values_from = AlphaEU_CE,
+    names_prefix = "CE_"
+  ) |>
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+alpha_eu_table_nf
+
+if (SAVE_OUTPUTS) {
+  write_csv(
+    alpha_eu_table_nf,
+    "3_Outputs/Table_Results_AlphaEU_NarrowFraming.csv"
   )
 }
