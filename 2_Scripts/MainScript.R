@@ -11,7 +11,7 @@ library(patchwork)
 library(urca)
 library(moments)
 library(RColorBrewer)
-library(stargazer)
+#library(stargazer)
 library(strucchange)
 
 # Toggle to enable/disable writing output files (CSV tables, PDF figures)
@@ -2533,5 +2533,618 @@ if (SAVE_OUTPUTS) {
   write_csv(
     alpha_eu_table_nf,
     "3_Outputs/Table_Results_AlphaEU_NarrowFraming.csv"
+  )
+}
+
+# ===============================================================================
+# 7.0 MULTI-FARM SIMULATION ====================================================
+# ===============================================================================
+
+# Farm heterogeneity comes from varying nitrogen application rates (N).
+n_farms <- 500
+N_mean <- 200
+N_sd <- 30
+N_min <- 50
+N_max <- 350
+
+set.seed(5678)
+N_farms <- rnorm(n_farms, mean = N_mean, sd = N_sd)
+N_farms <- pmax(pmin(N_farms, N_max), N_min)
+
+# -------------------------------------------------------------------------------
+## 7.0.1 Vectorized farm parameters (vectors of length n_farms) -----------------
+# -------------------------------------------------------------------------------
+
+CAN_farms <- N_farms / 0.27 / 1000
+pred_yield_farms <- coeff_0_yield +
+  coeff_1_yield * sqrt(N_farms) +
+  coeff_2_yield * N_farms
+pred_sigma_farms <- coeff_0_varf + coeff_1_varf * sqrt(N_farms)
+
+# -------------------------------------------------------------------------------
+## 7.0.2 Vectorized yield simulation (Ns x n_farms matrix) ----------------------
+# -------------------------------------------------------------------------------
+
+# Each column is one farm's Ns (Number of simulations) yield draws
+sim_yield_mat <- matrix(rnorm(Ns * n_farms), nrow = Ns, ncol = n_farms)
+# each column gets farm-specific mean and sd
+sim_yield_mat <- sweep(sim_yield_mat, 2, pred_sigma_farms, "*")
+sim_yield_mat <- sweep(sim_yield_mat, 2, pred_yield_farms, "+")
+
+# -------------------------------------------------------------------------------
+## 7.0.3 Vectorized profit matrices (Ns x n_farms each) -------------------------
+# -------------------------------------------------------------------------------
+
+# Price vectors (drop the single-year matrix dimension to plain vectors)
+sim_f_p_vec <- drop(sim_f_p)
+sim_w_p_vec <- drop(sim_w_p)
+sim_f_p_fwd_vec <- drop(sim_f_p_forward)
+
+# Helper: outer products give Ns x n_farms matrices
+fert_cost_spot <- outer(sim_f_p_vec, CAN_farms) # sim_f_p * CAN_f
+fert_cost_fwd <- outer(sim_f_p_fwd_vec, CAN_farms) # sim_f_p_forward * CAN_f
+
+# Wheat revenue: sim_w_p_vec (Ns) * sim_yield_mat (Ns x n_farms)
+wheat_rev <- sim_w_p_vec * sim_yield_mat
+
+# --- Broad framing profit matrices ---
+n_strikes <- nrow(premium_results)
+n_strikes_w <- nrow(premium_results_w)
+# Total scenarios: nc, fc, ac_1..5, wc_1..5, both_1..5 = 17
+broad_names <- c(
+  "nc",
+  "fc",
+  paste0("ac_", 1:n_strikes),
+  paste0("wc_", 1:n_strikes_w),
+  paste0("both_", 1:n_strikes)
+)
+
+# Store as a named list of Ns x n_farms matrices
+broad_mats <- list()
+broad_mats[["nc"]] <- wheat_rev - fert_cost_spot
+broad_mats[["fc"]] <- wheat_rev - fert_cost_fwd
+
+for (i in 1:n_strikes) {
+  k <- premium_results$strike_price[i]
+  cost <- premium_results$option_premium[i]
+  fert_capped <- outer(pmin(sim_f_p_vec, k), CAN_farms)
+  prem_cost <- outer(rep(cost, Ns), CAN_farms)
+  broad_mats[[paste0("ac_", i)]] <- wheat_rev - fert_capped - prem_cost
+}
+
+for (j in 1:n_strikes_w) {
+  k_w <- premium_results_w$strike_price[j]
+  c_w <- premium_results_w$option_premium[j]
+  wheat_floored <- pmax(sim_w_p_vec, k_w) * sim_yield_mat
+  wheat_prem <- c_w * sim_yield_mat
+  broad_mats[[paste0("wc_", j)]] <- wheat_floored - wheat_prem - fert_cost_spot
+}
+
+for (i in 1:n_strikes) {
+  k_f <- premium_results$strike_price[i]
+  c_f <- premium_results$option_premium[i]
+  k_w <- premium_results_w$strike_price[i]
+  c_w <- premium_results_w$option_premium[i]
+  broad_mats[[paste0("both_", i)]] <-
+    pmax(sim_w_p_vec, k_w) *
+    sim_yield_mat -
+    c_w * sim_yield_mat -
+    outer(pmin(sim_f_p_vec, k_f), CAN_farms) -
+    outer(rep(c_f, Ns), CAN_farms)
+}
+
+# --- Narrow framing profit matrices ---
+narrow_names <- c(
+  "fc",
+  paste0("ac_", 1:n_strikes),
+  paste0("wc_", 1:n_strikes_w),
+  paste0("both_", 1:n_strikes)
+)
+
+# Forward contract payoff: CAN_f * (fwd_price - spot_price)
+fwd_minus_spot <- sim_f_p_fwd_vec - sim_f_p_vec
+
+narrow_mats <- list()
+narrow_mats[["fc"]] <- outer(fwd_minus_spot, CAN_farms)
+
+for (i in 1:n_strikes) {
+  k <- premium_results$strike_price[i]
+  cost <- premium_results$option_premium[i]
+  narrow_mats[[paste0("ac_", i)]] <-
+    outer(pmax(sim_f_p_vec - k, 0) - cost, CAN_farms)
+}
+
+for (j in 1:n_strikes_w) {
+  k_w <- premium_results_w$strike_price[j]
+  c_w <- premium_results_w$option_premium[j]
+  narrow_mats[[paste0("wc_", j)]] <-
+    outer(pmax(k_w - sim_w_p_vec, 0) - c_w, pred_yield_farms)
+}
+
+for (i in 1:n_strikes) {
+  k_f <- premium_results$strike_price[i]
+  c_f <- premium_results$option_premium[i]
+  k_w <- premium_results_w$strike_price[i]
+  c_w <- premium_results_w$option_premium[i]
+  narrow_mats[[paste0("both_", i)]] <-
+    outer(pmax(sim_f_p_vec - k_f, 0) - c_f, CAN_farms) +
+    outer(pmax(k_w - sim_w_p_vec, 0) - c_w, pred_yield_farms)
+}
+
+# ------------------------------------------------------------------------------
+## 7.0.4 Vectorized EUT  -------------------------------------------------------
+# ------------------------------------------------------------------------------
+
+# EUT CE = mean - (delta/2) * var, computed directly from profit matrices.
+
+compute_eut_vectorized <- function(
+  profit_mats,
+  scenario_names,
+  delta_values,
+  N_farms,
+  n_farms
+) {
+  # profit_mats: named list of Ns x n_farms matrices
+  # Returns a data frame with columns: Variable, Delta, CertaintyEquivalent,
+  #   RiskPremium, farm_id, N
+  col_means <- lapply(profit_mats[scenario_names], colMeans) # list of n_farms vectors
+  col_vars <- lapply(profit_mats[scenario_names], function(m) apply(m, 2, var))
+
+  results <- vector("list", length(delta_values) * length(scenario_names))
+  idx <- 0L
+  for (d in delta_values) {
+    for (s in scenario_names) {
+      idx <- idx + 1L
+      mu <- col_means[[s]]
+      vr <- col_vars[[s]]
+      rp <- (d / 2) * vr
+      ce <- mu - rp
+      results[[idx]] <- data.frame(
+        Variable = s,
+        Delta = d,
+        CertaintyEquivalent = ce,
+        RiskPremium = rp,
+        farm_id = 1:n_farms,
+        N = N_farms
+      )
+    }
+  }
+  bind_rows(results)
+}
+
+delta_bf <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005)
+delta_nf <- c(0, 0.0005, 0.0007, 0.001, 0.003)
+
+eut_broad_all <- compute_eut_vectorized(
+  broad_mats,
+  broad_names,
+  delta_bf,
+  N_farms,
+  n_farms
+)
+eut_narrow_all <- compute_eut_vectorized(
+  narrow_mats,
+  narrow_names,
+  delta_nf,
+  N_farms,
+  n_farms
+)
+
+# -------------------------------------------------------------------------------
+## 7.0.5 Fast CPT for multi-farm ----------------------------------------
+# -------------------------------------------------------------------------------
+
+# CPT value for a single sorted numeric vector (base R only)
+cpt_single <- function(profits_sorted, ref, a, l, g) {
+  n <- length(profits_sorted)
+  prob <- 1 / n
+
+  # Split into losses (< ref) and gains (>= ref)
+  idx_loss <- profits_sorted < ref
+  n_loss <- sum(idx_loss)
+  n_gain <- n - n_loss
+
+  loss_val <- 0
+  if (n_loss > 0) {
+    # losses already sorted ascending; cumulative prob from worst
+    cum_p <- (1:n_loss) * prob
+    prev_p <- cum_p - prob
+    dw <- exp(-(-log(cum_p))^g) - ifelse(prev_p > 0, exp(-(-log(prev_p))^g), 0)
+    x_loss <- profits_sorted[idx_loss]
+    loss_val <- sum(-l * (-(x_loss - ref))^a * dw)
+  }
+
+  gain_val <- 0
+  if (n_gain > 0) {
+    # gains: reverse order (best first) for decumulative weighting
+    x_gain <- rev(profits_sorted[!idx_loss])
+    cum_p <- (1:n_gain) * prob
+    prev_p <- cum_p - prob
+    dw <- exp(-(-log(cum_p))^g) - ifelse(prev_p > 0, exp(-(-log(prev_p))^g), 0)
+    gain_val <- sum((x_gain - ref)^a * dw)
+  }
+
+  loss_val + gain_val
+}
+
+# Compute CPT across all farms for one scenario using its Ns x n_farms matrix
+compute_cpt_multifarm <- function(
+  profit_mats,
+  scenario_names,
+  ref_vecs,
+  a_values,
+  lambda_values,
+  gamma_values,
+  N_farms,
+  n_farms
+) {
+  # ref_vecs: named list of length-n_farms vectors (one ref point per farm per scenario set)
+  #           OR a single numeric vector of length n_farms applied to all scenarios
+  n_combos <- length(a_values) *
+    length(lambda_values) *
+    length(gamma_values) *
+    length(scenario_names)
+  results <- vector("list", n_combos)
+  idx <- 0L
+
+  for (a in a_values) {
+    for (l in lambda_values) {
+      for (g in gamma_values) {
+        for (s in scenario_names) {
+          idx <- idx + 1L
+          mat <- profit_mats[[s]] # Ns x n_farms
+          cpt_vals <- numeric(n_farms)
+          for (f in 1:n_farms) {
+            profits_sorted <- sort(mat[, f])
+            cpt_vals[f] <- cpt_single(profits_sorted, ref_vecs[f], a, l, g)
+          }
+          results[[idx]] <- data.frame(
+            Variable = s,
+            Alpha = a,
+            Lambda = l,
+            Gamma = g,
+            CPT_Value = cpt_vals,
+            farm_id = 1:n_farms,
+            N = N_farms
+          )
+        }
+      }
+    }
+  }
+  bind_rows(results)
+}
+
+# -------------------------------------------------------------------------------
+## 7.0.6 Alpha-EU for multi-farm -------------------------------------------
+# -------------------------------------------------------------------------------
+
+compute_alpha_eu_multifarm <- function(
+  profit_mats,
+  scenario_names,
+  ref_vecs,
+  delta_values,
+  alpha_values,
+  p_interval_offsets,
+  N_farms,
+  n_farms
+) {
+  # p_interval_offsets: vector of half-widths, e.g. c(0.20, 0.10, 0.05)
+  # ref_vecs: numeric vector length n_farms
+  results <- list()
+  idx <- 0L
+
+  for (d in delta_values) {
+    for (s in scenario_names) {
+      mat <- profit_mats[[s]] # Ns x n_farms
+
+      # Pre-compute per-farm EU for high and low states
+      eu_high <- numeric(n_farms)
+      eu_low <- numeric(n_farms)
+      n_high <- integer(n_farms)
+      n_low <- integer(n_farms)
+
+      for (f in 1:n_farms) {
+        x <- mat[, f]
+        ref <- ref_vecs[f]
+        hi <- x[x >= ref]
+        lo <- x[x < ref]
+        n_high[f] <- length(hi)
+        n_low[f] <- length(lo)
+        eu_high[f] <- if (length(hi) > 0) mean(-exp(-d * hi)) else NA
+        eu_low[f] <- if (length(lo) > 0) mean(-exp(-d * lo)) else NA
+      }
+
+      for (a in alpha_values) {
+        for (hw in p_interval_offsets) {
+          ce_vec <- numeric(n_farms)
+
+          for (f in 1:n_farms) {
+            if (is.na(eu_high[f]) || is.na(eu_low[f])) {
+              eu_s <- if (!is.na(eu_high[f])) eu_high[f] else eu_low[f]
+              ce_vec[f] <- -log(-eu_s) / d
+            } else {
+              p_hat_f <- n_low[f] / (n_low[f] + n_high[f])
+              p_min <- max(p_hat_f - hw, 0)
+              p_max <- min(p_hat_f + hw, 1)
+              eu_at_pmin <- p_min * eu_low[f] + (1 - p_min) * eu_high[f]
+              eu_at_pmax <- p_max * eu_low[f] + (1 - p_max) * eu_high[f]
+              alpha_eu_val <- a * eu_at_pmax + (1 - a) * eu_at_pmin
+              ce_vec[f] <- -log(-alpha_eu_val) / d
+            }
+          }
+
+          p_label <- paste0("[", hw, "]")
+          idx <- idx + 1L
+          results[[idx]] <- data.frame(
+            Variable = s,
+            Delta = d,
+            Alpha = a,
+            P_interval = p_label,
+            AlphaEU_CE = ce_vec,
+            farm_id = 1:n_farms,
+            N = N_farms
+          )
+        }
+      }
+    }
+  }
+  bind_rows(results)
+}
+
+# -------------------------------------------------------------------------------
+## 7.0.7 Run CPT and Alpha-EU across all farms ----------------------------------
+# -------------------------------------------------------------------------------
+
+# Broad framing reference points: per-farm mean of fc profits
+ref_broad_farms <- colMeans(broad_mats[["fc"]])
+
+cpt_broad_all <- compute_cpt_multifarm(
+  broad_mats,
+  broad_names,
+  ref_broad_farms,
+  a_values,
+  lambda,
+  gamma,
+  N_farms,
+  n_farms
+)
+
+alphaeu_broad_all <- compute_alpha_eu_multifarm(
+  broad_mats,
+  broad_names,
+  ref_broad_farms,
+  delta_amb,
+  alpha_amb,
+  c(0.20, 0.10, 0.05),
+  N_farms,
+  n_farms
+)
+
+# Narrow framing reference point: 0 for all farms
+ref_narrow_farms <- rep(0, n_farms)
+
+cpt_narrow_all <- compute_cpt_multifarm(
+  narrow_mats,
+  narrow_names,
+  ref_narrow_farms,
+  a_values,
+  lambda,
+  gamma,
+  N_farms,
+  n_farms
+)
+
+alphaeu_narrow_all <- compute_alpha_eu_multifarm(
+  narrow_mats,
+  narrow_names,
+  ref_narrow_farms,
+  delta_amb,
+  alpha_amb,
+  c(0.20, 0.10, 0.05),
+  N_farms,
+  n_farms
+)
+
+# -------------------------------------------------------------------------------
+## 7.2 Summary statistics across farms -------------------------------------------
+# -------------------------------------------------------------------------------
+
+eut_broad_summary <- eut_broad_all |>
+  group_by(Delta, Variable) |>
+  summarise(
+    mean_CE = mean(CertaintyEquivalent),
+    sd_CE = sd(CertaintyEquivalent),
+    q05_CE = quantile(CertaintyEquivalent, 0.05),
+    q25_CE = quantile(CertaintyEquivalent, 0.25),
+    median_CE = median(CertaintyEquivalent),
+    q75_CE = quantile(CertaintyEquivalent, 0.75),
+    q95_CE = quantile(CertaintyEquivalent, 0.95),
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+cpt_broad_summary <- cpt_broad_all |>
+  group_by(Alpha, Lambda, Gamma, Variable) |>
+  summarise(
+    mean_CPT = mean(CPT_Value),
+    sd_CPT = sd(CPT_Value),
+    q05_CPT = quantile(CPT_Value, 0.05),
+    q25_CPT = quantile(CPT_Value, 0.25),
+    median_CPT = median(CPT_Value),
+    q75_CPT = quantile(CPT_Value, 0.75),
+    q95_CPT = quantile(CPT_Value, 0.95),
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+alphaeu_broad_summary <- alphaeu_broad_all |>
+  group_by(Delta, Alpha, P_interval, Variable) |>
+  summarise(
+    mean_CE = mean(AlphaEU_CE),
+    sd_CE = sd(AlphaEU_CE),
+    q05_CE = quantile(AlphaEU_CE, 0.05),
+    q25_CE = quantile(AlphaEU_CE, 0.25),
+    median_CE = median(AlphaEU_CE),
+    q75_CE = quantile(AlphaEU_CE, 0.75),
+    q95_CE = quantile(AlphaEU_CE, 0.95),
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+eut_narrow_summary <- eut_narrow_all |>
+  group_by(Delta, Variable) |>
+  summarise(
+    mean_CE = mean(CertaintyEquivalent),
+    sd_CE = sd(CertaintyEquivalent),
+    q05_CE = quantile(CertaintyEquivalent, 0.05),
+    q25_CE = quantile(CertaintyEquivalent, 0.25),
+    median_CE = median(CertaintyEquivalent),
+    q75_CE = quantile(CertaintyEquivalent, 0.75),
+    q95_CE = quantile(CertaintyEquivalent, 0.95),
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+cpt_narrow_summary <- cpt_narrow_all |>
+  group_by(Alpha, Lambda, Gamma, Variable) |>
+  summarise(
+    mean_CPT = mean(CPT_Value),
+    sd_CPT = sd(CPT_Value),
+    q05_CPT = quantile(CPT_Value, 0.05),
+    q25_CPT = quantile(CPT_Value, 0.25),
+    median_CPT = median(CPT_Value),
+    q75_CPT = quantile(CPT_Value, 0.75),
+    q95_CPT = quantile(CPT_Value, 0.95),
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+alphaeu_narrow_summary <- alphaeu_narrow_all |>
+  group_by(Delta, Alpha, P_interval, Variable) |>
+  summarise(
+    mean_CE = mean(AlphaEU_CE),
+    sd_CE = sd(AlphaEU_CE),
+    q05_CE = quantile(AlphaEU_CE, 0.05),
+    q25_CE = quantile(AlphaEU_CE, 0.25),
+    median_CE = median(AlphaEU_CE),
+    q75_CE = quantile(AlphaEU_CE, 0.75),
+    q95_CE = quantile(AlphaEU_CE, 0.95),
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+# -------------------------------------------------------------------------------
+## 7.3 Save outputs --------------------------------------------------------------
+# -------------------------------------------------------------------------------
+
+if (SAVE_OUTPUTS) {
+  write_csv(eut_broad_summary, "3_Outputs/Table_MultiFarm_EUT_BroadFraming.csv")
+  write_csv(cpt_broad_summary, "3_Outputs/Table_MultiFarm_CPT_BroadFraming.csv")
+  write_csv(
+    alphaeu_broad_summary,
+    "3_Outputs/Table_MultiFarm_AlphaEU_BroadFraming.csv"
+  )
+  write_csv(
+    eut_narrow_summary,
+    "3_Outputs/Table_MultiFarm_EUT_NarrowFraming.csv"
+  )
+  write_csv(
+    cpt_narrow_summary,
+    "3_Outputs/Table_MultiFarm_CPT_NarrowFraming.csv"
+  )
+  write_csv(
+    alphaeu_narrow_summary,
+    "3_Outputs/Table_MultiFarm_AlphaEU_NarrowFraming.csv"
+  )
+}
+
+# -------------------------------------------------------------------------------
+## 7.4 Distribution plots -------------------------------------------------------
+# -------------------------------------------------------------------------------
+
+# EUT certainty equivalents under broad framing — one delta value
+plot_eut_broad_dist <- eut_broad_all |>
+  filter(Delta == 0.0001) |>
+  ggplot(aes(x = CertaintyEquivalent)) +
+  geom_density(fill = cb_colors[1], alpha = 0.4) +
+  facet_wrap(~Variable, scales = "free_x") +
+  labs(
+    title = "EUT Certainty Equivalents across farms (broad framing, delta = 0.0001)",
+    x = "Certainty Equivalent (eur/ha)",
+    y = "Density"
+  ) +
+  theme_minimal()
+
+plot_eut_broad_dist
+
+# CPT values under broad framing — standard assumptions
+plot_cpt_broad_dist <- cpt_broad_all |>
+  filter(Alpha == 0.334, Lambda == 1.574, Gamma == 0.571) |>
+  ggplot(aes(x = CPT_Value)) +
+  geom_density(fill = cb_colors[2], alpha = 0.4) +
+  facet_wrap(~Variable, scales = "free_x") +
+  labs(
+    title = "CPT Values across farms (broad framing, standard assumptions)",
+    x = "CPT Value",
+    y = "Density"
+  ) +
+  theme_minimal()
+
+plot_cpt_broad_dist
+
+# EUT certainty equivalents under narrow framing — one delta value
+plot_eut_narrow_dist <- eut_narrow_all |>
+  filter(Delta == 0.001) |>
+  ggplot(aes(x = CertaintyEquivalent)) +
+  geom_density(fill = cb_colors[1], alpha = 0.4) +
+  facet_wrap(~Variable, scales = "free_x") +
+  labs(
+    title = "EUT Certainty Equivalents across farms (narrow framing, delta = 0.001)",
+    x = "Certainty Equivalent (eur/ha)",
+    y = "Density"
+  ) +
+  theme_minimal()
+
+plot_eut_narrow_dist
+
+# CPT values under narrow framing — standard assumptions
+plot_cpt_narrow_dist <- cpt_narrow_all |>
+  filter(Alpha == 0.334, Lambda == 1.574, Gamma == 0.571) |>
+  ggplot(aes(x = CPT_Value)) +
+  geom_density(fill = cb_colors[2], alpha = 0.4) +
+  facet_wrap(~Variable, scales = "free_x") +
+  labs(
+    title = "CPT Values across farms (narrow framing, standard assumptions)",
+    x = "CPT Value",
+    y = "Density"
+  ) +
+  theme_minimal()
+
+plot_cpt_narrow_dist
+
+if (SAVE_OUTPUTS) {
+  ggsave(
+    "3_Outputs/Fig_MultiFarm_EUT_BroadFraming.pdf",
+    plot = plot_eut_broad_dist,
+    width = 14,
+    height = 10
+  )
+  ggsave(
+    "3_Outputs/Fig_MultiFarm_CPT_BroadFraming.pdf",
+    plot = plot_cpt_broad_dist,
+    width = 14,
+    height = 10
+  )
+  ggsave(
+    "3_Outputs/Fig_MultiFarm_EUT_NarrowFraming.pdf",
+    plot = plot_eut_narrow_dist,
+    width = 14,
+    height = 10
+  )
+  ggsave(
+    "3_Outputs/Fig_MultiFarm_CPT_NarrowFraming.pdf",
+    plot = plot_cpt_narrow_dist,
+    width = 14,
+    height = 10
   )
 }
