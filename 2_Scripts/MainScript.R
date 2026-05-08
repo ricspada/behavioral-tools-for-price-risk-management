@@ -1752,7 +1752,7 @@ sim_yield_plot
 #-------------------------------------------------------------------------------
 
 # get forward price
-sim_f_p_forward <- rep(tail(f_data$Avg_Price / 1000, 1) * discount_factor, Ns)
+sim_f_p_forward <- rep(tail(f_data$Avg_Price, 1) * discount_factor, Ns)
 
 # wheat forward price: last observed wheat price discounted to harvest
 # w_data$Avg_Price is in eur/t (no /1000 conversion needed unlike fertilizer)
@@ -1763,13 +1763,17 @@ profit_nc <- (sim_w_p * simulated_yield) - (sim_f_p * CAN)
 
 # Calculate "forward" profits
 profit_fc <- (sim_w_p * simulated_yield) - (sim_f_p_forward * CAN)
+profit_wfc <- (sim_w_p_forward * simulated_yield) - (sim_f_p * CAN)
+profit_both_fc <- (sim_w_p_forward * simulated_yield) - (sim_f_p_forward * CAN)
 
 # Calculate "adjusted contract" profits:
 
 # Initialize result data frame
 df_simulated_profit <- data.frame(
   nc = profit_nc,
-  fc = profit_fc
+  f_fc = profit_fc,
+  w_fc = profit_wfc,
+  both_fc = profit_both_fc
 )
 
 # Loop through each strike price and calculate adjusted contract profits
@@ -1784,7 +1788,7 @@ for (i in 1:nrow(premium_results)) {
     (contract_cost * CAN)
 
   # Add result columns for each strike price
-  col_name <- paste0("ac_", i)
+  col_name <- paste0("fc_", i)
   df_simulated_profit[[col_name]] <- profit_ac
 }
 
@@ -2131,7 +2135,7 @@ gamma <- c(0.4, 0.571, 0.7)
 # Reference point: expected profit under the status quo hedging strategy
 # (forward contract/buy and hold strategy). This represents the farmer's natural
 # benchmark for evaluating alternative risk management contracts.
-ref_point_broad <- mean(df_simulated_profit$fc)
+ref_point_broad <- mean(df_simulated_profit$both_fc)
 
 cpt_results_broadframing <- compute_cpt(
   df_simulated_profit,
@@ -2231,7 +2235,7 @@ alpha_amb <- c(0.1, 0.5, 0.9)
 delta_amb <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005)
 
 # Empirical probability of the adverse state (profits < ref point)
-p_hat <- mean(df_simulated_profit$fc < ref_point_broad)
+p_hat <- mean(df_simulated_profit$both_fc < ref_point_broad)
 
 # Belief bounds on Pr(low) centered on the empirical frequency
 # Three levels of ambiguity: high (±0.20), medium (±0.10), low (±0.05)
@@ -2275,13 +2279,19 @@ if (SAVE_OUTPUTS) {
 ## 6.0.1 calculate profits ------------------------------------------------------
 #-------------------------------------------------------------------------------
 
-# forward contract
+# forward contracts
 profit_fc_nf <- CAN * (sim_f_p_forward - sim_f_p)
+profit_wfc_nf <- predicted_yield * (sim_w_p_forward - sim_w_p)
+profit_both_fc_nf <- CAN *
+  (sim_f_p_forward - sim_f_p) +
+  predicted_yield * (sim_w_p_forward - sim_w_p)
 
 # adjusted contract
 # Initialize result data frame
 df_profit_narrowframing <- data.frame(
-  fc = profit_fc_nf
+  f_fc = profit_fc_nf,
+  w_fc = profit_wfc_nf,
+  both_fc = profit_both_fc_nf
 )
 
 for (i in 1:nrow(premium_results)) {
@@ -2290,8 +2300,8 @@ for (i in 1:nrow(premium_results)) {
 
   profit_ac <- CAN * (pmax(sim_f_p - k, 0) - contract_cost)
 
-  # Add column with name ac_1, ac_2, etc.
-  col_name <- paste0("ac_", i)
+  # Add column with name fc_1, fc_2, etc.
+  col_name <- paste0("fc_", i)
   df_profit_narrowframing[[col_name]] <- profit_ac
 }
 
@@ -2501,7 +2511,7 @@ if (SAVE_OUTPUTS) {
 #-------------------------------------------------------------------------------
 
 # Empirical probability of the adverse state (payoff < 0) under forward contract
-p_hat_nf <- mean(df_profit_narrowframing$fc < ref_point_narrow)
+p_hat_nf <- mean(df_profit_narrowframing$f_fc < ref_point_narrow)
 
 # Belief bounds on Pr(low) centered on empirical frequency
 p_intervals_nf <- list(
@@ -2540,7 +2550,8 @@ if (SAVE_OUTPUTS) {
 # 7.0 MULTI-FARM SIMULATION ====================================================
 # ===============================================================================
 
-# Farm heterogeneity comes from varying nitrogen application rates (N).
+# Link to location-specific yields from EPIC when we get the data. For now farm
+# heterogeneity comes from varying nitrogen application rates (N).
 n_farms <- 500
 N_mean <- 200
 N_sd <- 30
@@ -2590,26 +2601,32 @@ wheat_rev <- sim_w_p_vec * sim_yield_mat
 # --- Broad framing profit matrices ---
 n_strikes <- nrow(premium_results)
 n_strikes_w <- nrow(premium_results_w)
-# Total scenarios: nc, fc, ac_1..5, wc_1..5, both_1..5 = 17
+# Total scenarios: nc, f_fc, w_fc, both_fc, fc_1..5, wc_1..5, both_1..5 = 19
+sim_w_p_fwd_vec <- rep(sim_w_p_forward[1], Ns)
 broad_names <- c(
   "nc",
-  "fc",
-  paste0("ac_", 1:n_strikes),
+  "f_fc",
+  "w_fc",
+  "both_fc",
+  paste0("fc_", 1:n_strikes),
   paste0("wc_", 1:n_strikes_w),
   paste0("both_", 1:n_strikes)
 )
 
 # Store as a named list of Ns x n_farms matrices
+wheat_rev_fwd <- sim_w_p_fwd_vec * sim_yield_mat
 broad_mats <- list()
 broad_mats[["nc"]] <- wheat_rev - fert_cost_spot
-broad_mats[["fc"]] <- wheat_rev - fert_cost_fwd
+broad_mats[["f_fc"]] <- wheat_rev - fert_cost_fwd
+broad_mats[["w_fc"]] <- wheat_rev_fwd - fert_cost_spot
+broad_mats[["both_fc"]] <- wheat_rev_fwd - fert_cost_fwd
 
 for (i in 1:n_strikes) {
   k <- premium_results$strike_price[i]
   cost <- premium_results$option_premium[i]
   fert_capped <- outer(pmin(sim_f_p_vec, k), CAN_farms)
   prem_cost <- outer(rep(cost, Ns), CAN_farms)
-  broad_mats[[paste0("ac_", i)]] <- wheat_rev - fert_capped - prem_cost
+  broad_mats[[paste0("fc_", i)]] <- wheat_rev - fert_capped - prem_cost
 }
 
 for (j in 1:n_strikes_w) {
@@ -2635,22 +2652,28 @@ for (i in 1:n_strikes) {
 
 # --- Narrow framing profit matrices ---
 narrow_names <- c(
-  "fc",
-  paste0("ac_", 1:n_strikes),
+  "f_fc",
+  "w_fc",
+  "both_fc",
+  paste0("fc_", 1:n_strikes),
   paste0("wc_", 1:n_strikes_w),
   paste0("both_", 1:n_strikes)
 )
 
-# Forward contract payoff: CAN_f * (fwd_price - spot_price)
+# Forward contract payoffs
 fwd_minus_spot <- sim_f_p_fwd_vec - sim_f_p_vec
+wfwd_minus_spot <- sim_w_p_fwd_vec - sim_w_p_vec
 
 narrow_mats <- list()
-narrow_mats[["fc"]] <- outer(fwd_minus_spot, CAN_farms)
+narrow_mats[["f_fc"]] <- outer(fwd_minus_spot, CAN_farms)
+narrow_mats[["w_fc"]] <- outer(wfwd_minus_spot, pred_yield_farms)
+narrow_mats[["both_fc"]] <- outer(fwd_minus_spot, CAN_farms) +
+  outer(wfwd_minus_spot, pred_yield_farms)
 
 for (i in 1:n_strikes) {
   k <- premium_results$strike_price[i]
   cost <- premium_results$option_premium[i]
-  narrow_mats[[paste0("ac_", i)]] <-
+  narrow_mats[[paste0("fc_", i)]] <-
     outer(pmax(sim_f_p_vec - k, 0) - cost, CAN_farms)
 }
 
@@ -2896,7 +2919,7 @@ compute_alpha_eu_multifarm <- function(
 # -------------------------------------------------------------------------------
 
 # Broad framing reference points: per-farm mean of fc profits
-ref_broad_farms <- colMeans(broad_mats[["fc"]])
+ref_broad_farms <- colMeans(broad_mats[["both_fc"]])
 
 cpt_broad_all <- compute_cpt_multifarm(
   broad_mats,
@@ -3061,13 +3084,12 @@ if (SAVE_OUTPUTS) {
 # -------------------------------------------------------------------------------
 ## 7.4 Distribution plots -------------------------------------------------------
 # -------------------------------------------------------------------------------
-
+library(ggridges)
 # EUT certainty equivalents under broad framing — one delta value
 plot_eut_broad_dist <- eut_broad_all |>
   filter(Delta == 0.0001) |>
-  ggplot(aes(x = CertaintyEquivalent)) +
-  geom_density(fill = cb_colors[1], alpha = 0.4) +
-  facet_wrap(~Variable, scales = "free_x") +
+  ggplot(aes(x = CertaintyEquivalent, y = Variable)) +
+  geom_density_ridges_gradient(alpha = 0.4) +
   labs(
     title = "EUT Certainty Equivalents across farms (broad framing, delta = 0.0001)",
     x = "Certainty Equivalent (eur/ha)",
@@ -3080,9 +3102,8 @@ plot_eut_broad_dist
 # CPT values under broad framing — standard assumptions
 plot_cpt_broad_dist <- cpt_broad_all |>
   filter(Alpha == 0.334, Lambda == 1.574, Gamma == 0.571) |>
-  ggplot(aes(x = CPT_Value)) +
-  geom_density(fill = cb_colors[2], alpha = 0.4) +
-  facet_wrap(~Variable, scales = "free_x") +
+  ggplot(aes(x = CPT_Value, y = Variable)) +
+  geom_density_ridges(alpha = 0.4) +
   labs(
     title = "CPT Values across farms (broad framing, standard assumptions)",
     x = "CPT Value",
@@ -3095,24 +3116,22 @@ plot_cpt_broad_dist
 # EUT certainty equivalents under narrow framing — one delta value
 plot_eut_narrow_dist <- eut_narrow_all |>
   filter(Delta == 0.001) |>
-  ggplot(aes(x = CertaintyEquivalent)) +
-  geom_density(fill = cb_colors[1], alpha = 0.4) +
-  facet_wrap(~Variable, scales = "free_x") +
+  ggplot(aes(x = CertaintyEquivalent, y = Variable)) +
+  geom_density_ridges(alpha = 0.4) +
   labs(
     title = "EUT Certainty Equivalents across farms (narrow framing, delta = 0.001)",
     x = "Certainty Equivalent (eur/ha)",
     y = "Density"
   ) +
-  theme_minimal()
+  theme_ridges()
 
 plot_eut_narrow_dist
 
 # CPT values under narrow framing — standard assumptions
 plot_cpt_narrow_dist <- cpt_narrow_all |>
   filter(Alpha == 0.334, Lambda == 1.574, Gamma == 0.571) |>
-  ggplot(aes(x = CPT_Value)) +
-  geom_density(fill = cb_colors[2], alpha = 0.4) +
-  facet_wrap(~Variable, scales = "free_x") +
+  ggplot(aes(x = CPT_Value, y = Variable)) +
+  geom_density_ridges(alpha = 0.4) +
   labs(
     title = "CPT Values across farms (narrow framing, standard assumptions)",
     x = "CPT Value",
