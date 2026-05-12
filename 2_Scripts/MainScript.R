@@ -1476,230 +1476,12 @@ if (SAVE_OUTPUTS) {
 }
 
 # ==============================================================================
-# 5.0 Simulation of Utility of profits -----------------------------------------
+# 5.0 MULTI-FARM SIMULATION ----------------------------------------------------
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-## 5.1 Functions for EUT, CPT, and Ambiguity calculations ----------------------
+## 5.0.0 Parameters needed by multi-farm simulation ----------------------------
 # ------------------------------------------------------------------------------
-
-# ------------------------------------------------------------------------------
-## 5.1.1 EUT -------------------------------------------------------------------
-# ------------------------------------------------------------------------------
-
-# Compute EUT certainty equivalents using Mean-Variance approximation
-compute_eut <- function(profit_df, delta_values) {
-  target_cols <- colnames(profit_df)
-  results_list <- vector("list", length(delta_values) * length(target_cols))
-  idx <- 0L
-  for (d in delta_values) {
-    for (col_name in target_cols) {
-      idx <- idx + 1L
-      profits <- profit_df[[col_name]]
-      mean_profit <- mean(profits)
-      var_profit <- var(profits)
-      RP <- (d / 2) * var_profit
-      CE <- mean_profit - RP
-      results_list[[idx]] <- data.frame(
-        Variable = col_name,
-        Delta = d,
-        CertaintyEquivalent = CE,
-        RiskPremium = RP
-      )
-    }
-  }
-  bind_rows(results_list)
-}
-
-# ------------------------------------------------------------------------------
-## 5.1.2 CPT -------------------------------------------------------------------
-# ------------------------------------------------------------------------------
-
-# Value function (Tversky & Kahneman 1992)
-v <- function(x, a, l, ref) {
-  ifelse(x >= ref, (x - ref)^a, -l * (-(x - ref))^a)
-}
-
-# Probability weighting function (Prelec 1998)
-weighting_function <- function(p, g) {
-  exp(-(-log(p))^g)
-}
-
-# Compute CPT values for all parameter combinations
-compute_cpt <- function(
-  profit_df,
-  ref_point,
-  a_values,
-  lambda_values,
-  gamma_values
-) {
-  target_cols <- colnames(profit_df)
-  n_combos <- length(a_values) *
-    length(lambda_values) *
-    length(gamma_values) *
-    length(target_cols)
-  results_list <- vector("list", n_combos)
-  idx <- 0L
-
-  for (a in a_values) {
-    for (l in lambda_values) {
-      for (g in gamma_values) {
-        for (col_name in target_cols) {
-          idx <- idx + 1L
-          profits <- sort(profit_df[[col_name]])
-
-          n <- length(profits)
-          probs <- rep(1 / n, n)
-          df <- data.frame(profit = profits, prob = probs)
-
-          losses <- df |>
-            dplyr::filter(profit < ref_point) |>
-            dplyr::arrange(profit)
-          gains <- df |>
-            dplyr::filter(profit >= ref_point) |>
-            dplyr::arrange(dplyr::desc(profit))
-
-          # Decision weights for losses
-          if (nrow(losses) > 0) {
-            losses <- losses |>
-              dplyr::mutate(
-                cum_p = cumsum(prob),
-                dw = weighting_function(cum_p, g) -
-                  weighting_function(cum_p - prob, g)
-              )
-          }
-
-          # Decision weights for gains (weighted separately per TK1992)
-          if (nrow(gains) > 0) {
-            gains <- gains |>
-              dplyr::mutate(
-                cum_p = cumsum(prob),
-                dw = weighting_function(cum_p, g) -
-                  weighting_function(cum_p - prob, g)
-              )
-          }
-
-          loss_value <- if (nrow(losses) > 0) {
-            sum(v(losses$profit, a, l, ref_point) * losses$dw)
-          } else {
-            0
-          }
-
-          gain_value <- if (nrow(gains) > 0) {
-            sum(v(gains$profit, a, l, ref_point) * gains$dw)
-          } else {
-            0
-          }
-
-          results_list[[idx]] <- data.frame(
-            Variable = col_name,
-            Alpha = a,
-            Lambda = l,
-            Gamma = g,
-            CPT_Value = loss_value + gain_value
-          )
-        }
-      }
-    }
-  }
-  bind_rows(results_list)
-}
-
-# ------------------------------------------------------------------------------
-## 5.1.3 Ambiguity -------------------------------------------------------------
-# ------------------------------------------------------------------------------
-
-# Compute alpha-EU certainty equivalents under ambiguity.
-# p_intervals refer to Pr(low), i.e. the probability of the adverse state
-# (profits < ref_point). Intervals should be centered on the empirical
-# frequency of that state.
-compute_alpha_eu <- function(
-  profit_df,
-  ref_point,
-  delta_values,
-  alpha_values,
-  p_intervals
-) {
-  target_cols <- colnames(profit_df)
-  results_list <- list()
-  idx <- 0L
-
-  for (d in delta_values) {
-    for (col_name in target_cols) {
-      profits <- profit_df[[col_name]]
-
-      high <- profits[profits >= ref_point]
-      low <- profits[profits < ref_point]
-
-      # Expected CARA utility within each state
-      eu_high <- if (length(high) > 0) mean(-exp(-d * high)) else NA
-      eu_low <- if (length(low) > 0) mean(-exp(-d * low)) else NA
-
-      # If all observations fall in one state, E^P[U] is constant in P
-      # and alpha-EU collapses to standard EU
-      if (is.na(eu_high) || is.na(eu_low)) {
-        eu_single <- if (!is.na(eu_high)) eu_high else eu_low
-        ce_single <- -log(-eu_single) / d
-
-        for (a in alpha_values) {
-          for (pi in p_intervals) {
-            idx <- idx + 1L
-            results_list[[idx]] <- data.frame(
-              Variable = col_name,
-              Delta = d,
-              Alpha = a,
-              P_interval = paste0("[", pi[1], ", ", pi[2], "]"),
-              AlphaEU_CE = ce_single
-            )
-          }
-        }
-        next
-      }
-
-      for (a in alpha_values) {
-        for (pi in p_intervals) {
-          p_min <- pi[1]
-          p_max <- pi[2]
-
-          # p refers to Pr(low): EU is decreasing in p, so
-          # p_max gives min EU (worst case), p_min gives max EU (best case)
-          eu_at_pmin <- p_min * eu_low + (1 - p_min) * eu_high
-          eu_at_pmax <- p_max * eu_low + (1 - p_max) * eu_high
-
-          # alpha weights the pessimistic (min) prior
-          alpha_eu_val <- a * eu_at_pmax + (1 - a) * eu_at_pmin
-
-          ce <- -log(-alpha_eu_val) / d
-
-          idx <- idx + 1L
-          results_list[[idx]] <- data.frame(
-            Variable = col_name,
-            Delta = d,
-            Alpha = a,
-            P_interval = paste0("[", pi[1], ", ", pi[2], "]"),
-            AlphaEU_CE = ce
-          )
-        }
-      }
-    }
-  }
-  bind_rows(results_list)
-}
-
-# ===============================================================================
-## 5.2 Broad framing ============================================================
-# ===============================================================================
-
-# Parameters
-
-# kg of N/ha applied
-N <- 200
-# tonnes of CAN/ha (contains 27% N)
-CAN <- N / 0.27 / 1000
-
-#-------------------------------------------------------------------------------
-### 5.2.1 Simulate stochastic yields -------------------------------------------
-#-------------------------------------------------------------------------------
 
 # Get coeff from production function regression
 # Only intercept + nitrogen coefficients are used, which implicitly predicts
@@ -1709,846 +1491,14 @@ coeff_0_yield <- yield_function$coefficients[1]
 coeff_1_yield <- yield_function$coefficients[2]
 coeff_2_yield <- yield_function$coefficients[3]
 
-# generate predicted yield
-predicted_yield <- coeff_0_yield + coeff_1_yield * sqrt(N) + coeff_2_yield * N
-
 # Get coeff from variation function regression
 # Same reference scenario: rainfed + conventional BAU tillage.
 coeff_0_varf <- variation_function$coefficients[1]
 coeff_1_varf <- variation_function$coefficients[2]
 
-# generate predicted variation
-predicted_sigma_yield <- coeff_0_varf + coeff_1_varf * sqrt(N)
-
-# derive stochastic error
-stochastic_error <- array(dim = c(Ns, simulated_years))
-
-for (t in 1:simulated_years) {
-  # NOTE: Assumes normally distributed yield errors. If residuals from the
-  # yield function are significantly skewed (e.g., left-skew from drought),
-  # consider using a skewed distribution or adding a third-moment function.
-  stochastic_error[, t] <- rnorm(n = Ns, mean = 0, sd = predicted_sigma_yield)
-}
-
-# simulation of stochastic yields
-simulated_yield <- array(dim = c(Ns, simulated_years))
-
-for (t in 1:simulated_years) {
-  simulated_yield[, t] <- predicted_yield + stochastic_error[, t]
-}
-
-# plot simulated yields
-df_sim_yield <- data.frame(yield = simulated_yield[, 1])
-
-sim_yield_plot <- ggplot(df_sim_yield, aes(x = yield)) +
-  geom_histogram() +
-  theme_minimal() +
-  labs(x = "Simulated yield (t/ha)", y = "Density")
-
-sim_yield_plot
-
-#-------------------------------------------------------------------------------
-### 5.2.2 Get price simulations and calculate profits --------------------------
-#-------------------------------------------------------------------------------
-
-# get forward price
+# Forward prices
 sim_f_p_forward <- rep(tail(f_data$Avg_Price, 1) * discount_factor, Ns)
-
-# wheat forward price: last observed wheat price discounted to harvest
-# w_data$Avg_Price is in eur/t (no /1000 conversion needed unlike fertilizer)
 sim_w_p_forward <- rep(tail(w_data$Avg_Price, 1) * discount_factor_w, Ns)
-
-# Calculate "no contract" profits
-profit_nc <- (sim_w_p * simulated_yield) - (sim_f_p * CAN)
-
-# Calculate "forward" profits
-profit_fc <- (sim_w_p * simulated_yield) - (sim_f_p_forward * CAN)
-profit_wfc <- (sim_w_p_forward * simulated_yield) - (sim_f_p * CAN)
-profit_both_fc <- (sim_w_p_forward * simulated_yield) - (sim_f_p_forward * CAN)
-
-# Calculate "adjusted contract" profits:
-
-# Initialize result data frame
-df_simulated_profit <- data.frame(
-  nc = profit_nc,
-  f_fc = profit_fc,
-  w_fc = profit_wfc,
-  both_fc = profit_both_fc
-)
-
-# Loop through each strike price and calculate adjusted contract profits
-for (i in 1:nrow(premium_results)) {
-  k <- premium_results$strike_price[i]
-  contract_cost <- premium_results$option_premium[i]
-
-  sim_f_p_adj_contr <- pmin(sim_f_p, k)
-
-  profit_ac <- (sim_w_p * simulated_yield) -
-    (sim_f_p_adj_contr * CAN) -
-    (contract_cost * CAN)
-
-  # Add result columns for each strike price
-  col_name <- paste0("fc_", i)
-  df_simulated_profit[[col_name]] <- profit_ac
-}
-
-# Wheat minimum-price contracts (wc_j): spot fertilizer + floored wheat revenue ----
-for (j in 1:nrow(premium_results_w)) {
-  k_w <- premium_results_w$strike_price[j]
-  c_w <- premium_results_w$option_premium[j]
-
-  profit_wc <- (pmax(sim_w_p, k_w) * simulated_yield) -
-    (c_w * simulated_yield) - # put premium (eur/t) x yield (t/ha) = eur/ha
-    (sim_f_p * CAN) # fertilizer at spot price
-
-  col_name <- paste0("wc_", j)
-  df_simulated_profit[[col_name]] <- profit_wc
-}
-
-# Combined fertilizer max-price + wheat min-price contracts (both_i, diagonal) ----
-# Strike i for fertilizer is paired with strike i for wheat (rank-matched)
-for (i in 1:nrow(premium_results)) {
-  k_f <- premium_results$strike_price[i]
-  c_f <- premium_results$option_premium[i]
-  k_w <- premium_results_w$strike_price[i]
-  c_w <- premium_results_w$option_premium[i]
-
-  profit_both <- (pmax(sim_w_p, k_w) * simulated_yield) -
-    (c_w * simulated_yield) - # wheat put premium (eur/ha)
-    (pmin(sim_f_p, k_f) * CAN) - # fertilizer capped at k_f
-    (c_f * CAN) # fertilizer call premium (eur/ha)
-
-  col_name <- paste0("both_", i)
-  df_simulated_profit[[col_name]] <- profit_both
-}
-
-#-------------------------------------------------------------------------------
-## 5.3 Summary tables ----------------------------------------------------------
-#-------------------------------------------------------------------------------
-
-#-------------------------------------------------------------------------------
-### 5.3.1 CAN price paid under different contracts -----------------------------
-#-------------------------------------------------------------------------------
-
-base_row_sim_prices <- tibble(
-  strike = NA,
-  mean = mean(sim_f_p),
-  median = median(sim_f_p),
-  sd = sd(sim_f_p),
-  min = min(sim_f_p),
-  max = max(sim_f_p)
-)
-
-base_row_forward_prices <- tibble(
-  strike = NA,
-  mean = mean(sim_f_p_forward),
-  median = median(sim_f_p_forward),
-  sd = sd(sim_f_p_forward),
-  min = min(sim_f_p_forward),
-  max = max(sim_f_p_forward)
-)
-
-stats_list <- list()
-
-for (i in 1:nrow(premium_results)) {
-  k <- premium_results$strike_price[i]
-
-  sim_f_p_adj_contr <- pmin(sim_f_p, k)
-
-  stats_list[[i]] <- tibble(
-    strike = k,
-
-    # stats for capped simulated prices
-    mean = mean(sim_f_p_adj_contr),
-    median = median(sim_f_p_adj_contr),
-    sd = sd(sim_f_p_adj_contr),
-    min = min(sim_f_p_adj_contr),
-    max = max(sim_f_p_adj_contr)
-  )
-}
-
-# combine into a single dataframe
-price_stats_table <- bind_rows(
-  base_row_sim_prices,
-  base_row_forward_prices,
-  stats_list
-) |>
-  mutate(across(where(is.numeric), ~ round(., 3)))
-
-price_stats_table
-
-if (SAVE_OUTPUTS) {
-  write_csv(price_stats_table, "3_Outputs/Table_ResultsPriceStats.csv")
-}
-
-#-------------------------------------------------------------------------------
-### 5.3.2 Total costs under different contracts --------------------------------
-#-------------------------------------------------------------------------------
-
-base_row_costs <- tibble(
-  strike = NA,
-  mean = mean(sim_f_p * CAN),
-  median = median(sim_f_p * CAN),
-  sd = sd(sim_f_p * CAN),
-  min = min(sim_f_p * CAN),
-  max = max(sim_f_p * CAN)
-)
-
-base_row_forward_costs <- tibble(
-  strike = NA,
-  mean = mean(sim_f_p_forward * CAN),
-  median = median(sim_f_p_forward * CAN),
-  sd = sd(sim_f_p_forward * CAN),
-  min = min(sim_f_p_forward * CAN),
-  max = max(sim_f_p_forward * CAN),
-)
-
-stats_list <- list()
-
-for (i in 1:nrow(premium_results)) {
-  k <- premium_results$strike_price[i]
-  cost <- premium_results$option_premium[i]
-
-  sim_f_p_adj_contr <- pmin(sim_f_p, k)
-
-  stats_list[[i]] <- tibble(
-    strike = k,
-    mean = mean((sim_f_p_adj_contr * CAN) + (cost * CAN)),
-    median = median((sim_f_p_adj_contr * CAN) + (cost * CAN)),
-    sd = sd((sim_f_p_adj_contr * CAN) + (cost * CAN)),
-    min = min((sim_f_p_adj_contr * CAN) + (cost * CAN)),
-    max = max((sim_f_p_adj_contr * CAN) + (cost * CAN))
-  )
-}
-
-# combine into a single dataframe
-costs_stats_table <- bind_rows(
-  base_row_costs,
-  base_row_forward_costs,
-  stats_list
-) |>
-  mutate(across(where(is.numeric), ~ round(., 2)))
-
-costs_stats_table
-
-if (SAVE_OUTPUTS) {
-  write_csv(costs_stats_table, "3_Outputs/Table_ResultsCostsStats.csv")
-}
-
-#-------------------------------------------------------------------------------
-### 5.3.3 Wheat price received under different contracts -----------------------
-#-------------------------------------------------------------------------------
-
-base_row_wheat_prices <- tibble(
-  strike = NA,
-  mean = mean(sim_w_p),
-  median = median(sim_w_p),
-  sd = sd(sim_w_p),
-  min = min(sim_w_p),
-  max = max(sim_w_p)
-)
-
-base_row_wheat_forward_prices <- tibble(
-  strike = NA,
-  mean = mean(sim_w_p_forward),
-  median = median(sim_w_p_forward),
-  sd = sd(sim_w_p_forward),
-  min = min(sim_w_p_forward),
-  max = max(sim_w_p_forward)
-)
-
-stats_list <- list()
-
-for (i in 1:nrow(premium_results_w)) {
-  k_w <- premium_results_w$strike_price[i]
-
-  sim_w_p_adj_contr <- pmax(sim_w_p, k_w)
-
-  stats_list[[i]] <- tibble(
-    strike = k_w,
-    mean = mean(sim_w_p_adj_contr),
-    median = median(sim_w_p_adj_contr),
-    sd = sd(sim_w_p_adj_contr),
-    min = min(sim_w_p_adj_contr),
-    max = max(sim_w_p_adj_contr)
-  )
-}
-
-wheat_price_stats_table <- bind_rows(
-  base_row_wheat_prices,
-  base_row_wheat_forward_prices,
-  stats_list
-) |>
-  mutate(across(where(is.numeric), ~ round(., 3)))
-
-wheat_price_stats_table
-
-if (SAVE_OUTPUTS) {
-  write_csv(
-    wheat_price_stats_table,
-    "3_Outputs/Table_ResultsWheatPriceStats.csv"
-  )
-}
-
-#-------------------------------------------------------------------------------
-### 5.3.4 Total wheat revenue under different contracts ------------------------
-#-------------------------------------------------------------------------------
-
-base_row_wheat_revenue <- tibble(
-  strike = NA,
-  mean = mean(sim_w_p * simulated_yield),
-  median = median(sim_w_p * simulated_yield),
-  sd = sd(sim_w_p * simulated_yield),
-  min = min(sim_w_p * simulated_yield),
-  max = max(sim_w_p * simulated_yield)
-)
-
-base_row_wheat_forward_revenue <- tibble(
-  strike = NA,
-  mean = mean(sim_w_p_forward * simulated_yield),
-  median = median(sim_w_p_forward * simulated_yield),
-  sd = sd(sim_w_p_forward * simulated_yield),
-  min = min(sim_w_p_forward * simulated_yield),
-  max = max(sim_w_p_forward * simulated_yield)
-)
-
-stats_list <- list()
-
-for (i in 1:nrow(premium_results_w)) {
-  k_w <- premium_results_w$strike_price[i]
-  c_w <- premium_results_w$option_premium[i]
-
-  wheat_revenue <- pmax(sim_w_p, k_w) * simulated_yield - c_w * simulated_yield
-
-  stats_list[[i]] <- tibble(
-    strike = k_w,
-    mean = mean(wheat_revenue),
-    median = median(wheat_revenue),
-    sd = sd(wheat_revenue),
-    min = min(wheat_revenue),
-    max = max(wheat_revenue)
-  )
-}
-
-wheat_revenue_stats_table <- bind_rows(
-  base_row_wheat_revenue,
-  base_row_wheat_forward_revenue,
-  stats_list
-) |>
-  mutate(across(where(is.numeric), ~ round(., 2)))
-
-wheat_revenue_stats_table
-
-if (SAVE_OUTPUTS) {
-  write_csv(
-    wheat_revenue_stats_table,
-    "3_Outputs/Table_ResultsWheatRevenueStats.csv"
-  )
-}
-
-#-------------------------------------------------------------------------------
-### 5.3.5 Total profits under different contracts ------------------------------
-#-------------------------------------------------------------------------------
-
-summary_profits <- df_simulated_profit |>
-  pivot_longer(everything(), names_to = "variable", values_to = "value") |>
-  group_by(variable) |>
-  summarise(
-    mean = mean(value),
-    median = median(value),
-    sd = sd(value),
-    min = min(value),
-    max = max(value)
-  ) |>
-  mutate(across(where(is.numeric), ~ round(., 2)))
-
-summary_profits
-
-if (SAVE_OUTPUTS) {
-  write_csv(summary_profits, "3_Outputs/Table_ResultsProfitStats.csv")
-}
-
-#-------------------------------------------------------------------------------
-## 5.4 Expected Utility Theory (EUT) values under broad framing ----------------
-#-------------------------------------------------------------------------------
-
-# define absolute risk aversion values
-delta <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005)
-
-target_cols <- colnames(df_simulated_profit)
-
-# CE and RP with Mean-Variance approximation: CE = E[π] - (δ/2)·Var[π]
-# This is a second-order Taylor approximation of expected utility, valid when
-# the distribution of profits is approximately normal or risk aversion is small.
-eut_results_broadframing <- compute_eut(df_simulated_profit, delta)
-
-# make table of results
-eut_results_broadframing <- eut_results_broadframing |>
-  pivot_wider(
-    names_from = Variable,
-    values_from = c(CertaintyEquivalent, RiskPremium),
-    names_sep = "_"
-  ) |>
-  mutate(across(where(is.numeric), ~ round(.x, 2)))
-
-# Reorder columns to group CE and RP by contract
-contract_columns <- c()
-for (contract in target_cols) {
-  contract_columns <- c(
-    contract_columns,
-    paste0("CertaintyEquivalent_", contract),
-    paste0("RiskPremium_", contract)
-  )
-}
-
-eut_results_broadframing <- eut_results_broadframing |>
-  dplyr::select(Delta, all_of(contract_columns))
-
-# rename columns
-colnames(eut_results_broadframing) <- c(
-  "Delta",
-  unlist(lapply(target_cols, function(x) c(paste0(x, "_CE"), paste0(x, "_RP"))))
-)
-
-eut_results_broadframing
-
-if (SAVE_OUTPUTS) {
-  write_csv(
-    eut_results_broadframing,
-    "3_Outputs/Table_Results_EUT_Broadframing.csv"
-  )
-}
-
-#-------------------------------------------------------------------------------
-## 5.5 Cumulative Prospect Theory (CPT) under broad framing --------------------
-#-------------------------------------------------------------------------------
-
-# risk aversion
-a_values <- c(0.1, 0.334, 0.5)
-
-# loss aversion
-lambda <- c(0.5, 1.574, 2)
-
-# probability weighting
-gamma <- c(0.4, 0.571, 0.7)
-
-# Reference point: expected profit under the status quo hedging strategy
-# (forward contract/buy and hold strategy). This represents the farmer's natural
-# benchmark for evaluating alternative risk management contracts.
-ref_point_broad <- mean(df_simulated_profit$both_fc)
-
-cpt_results_broadframing <- compute_cpt(
-  df_simulated_profit,
-  ref_point_broad,
-  a_values,
-  lambda,
-  gamma
-)
-
-#-------------------------------------------------------------------------------
-### 5.5.1 display CPT results --------------------------------------------------
-#-------------------------------------------------------------------------------
-
-# standard assumptions
-alpha_std <- 0.334
-lambda_std <- 1.574
-gamma_std <- 0.571
-
-# standard scenario
-std_row <- cpt_results_broadframing |>
-  filter(
-    Alpha == alpha_std,
-    Lambda == lambda_std,
-    Gamma == gamma_std
-  ) |>
-  dplyr::select(Variable, CPT_Value) |>
-  pivot_wider(
-    names_from = Variable,
-    values_from = CPT_Value
-  ) |>
-  mutate(Scenario = "Standard Assumptions")
-
-# varying risk aversion
-alpha_rows <- cpt_results_broadframing |>
-  filter(
-    Alpha != alpha_std,
-    Lambda == lambda_std,
-    Gamma == gamma_std
-  ) |>
-  dplyr::select(Alpha, Variable, CPT_Value) |>
-  pivot_wider(
-    names_from = Variable,
-    values_from = CPT_Value
-  ) |>
-  rename(Scenario = Alpha) |>
-  mutate(Scenario = paste0("Alpha = ", Scenario))
-
-# varying loss aversion
-lambda_rows <- cpt_results_broadframing |>
-  filter(
-    Alpha == alpha_std,
-    Lambda != lambda_std,
-    Gamma == gamma_std
-  ) |>
-  dplyr::select(Lambda, Variable, CPT_Value) |>
-  pivot_wider(
-    names_from = Variable,
-    values_from = CPT_Value
-  ) |>
-  rename(Scenario = Lambda) |>
-  mutate(Scenario = paste0("Lambda = ", Scenario))
-
-# varying prob weighting
-gamma_rows <- cpt_results_broadframing |>
-  filter(
-    Alpha == alpha_std,
-    Lambda == lambda_std,
-    Gamma != gamma_std
-  ) |>
-  dplyr::select(Gamma, Variable, CPT_Value) |>
-  pivot_wider(
-    names_from = Variable,
-    values_from = CPT_Value
-  ) |>
-  rename(Scenario = Gamma) |>
-  mutate(Scenario = paste0("Gamma = ", Scenario))
-
-# combine
-final_cpt_table <- bind_rows(std_row, alpha_rows, lambda_rows, gamma_rows) |>
-  relocate(Scenario) |>
-  mutate(across(where(is.numeric), ~ round(., 2)))
-
-final_cpt_table
-
-if (SAVE_OUTPUTS) {
-  write_csv(final_cpt_table, "3_Outputs/Table_Results_CPT_BroadFraming.csv")
-}
-
-#-------------------------------------------------------------------------------
-## 5.6 Alpha-EU under broad framing --------------------------------------------
-#-------------------------------------------------------------------------------
-
-# Ambiguity aversion parameter (0 = full ambiguity loving, 1 = full aversion)
-alpha_amb <- c(0.1, 0.5, 0.9)
-
-# Risk aversion (CARA)
-delta_amb <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005)
-
-# Empirical probability of the adverse state (profits < ref point)
-p_hat <- mean(df_simulated_profit$both_fc < ref_point_broad)
-
-# Belief bounds on Pr(low) centered on the empirical frequency
-# Three levels of ambiguity: high (±0.20), medium (±0.10), low (±0.05)
-p_intervals <- list(
-  c(max(p_hat - 0.20, 0), min(p_hat + 0.20, 1)),
-  c(max(p_hat - 0.10, 0), min(p_hat + 0.10, 1)),
-  c(max(p_hat - 0.05, 0), min(p_hat + 0.05, 1))
-)
-
-alpha_eu_results <- compute_alpha_eu(
-  df_simulated_profit,
-  ref_point_broad,
-  delta_amb,
-  alpha_amb,
-  p_intervals
-)
-
-# Pivot to wide format: one row per (Delta, Alpha, P_interval), columns = scenarios
-alpha_eu_table <- alpha_eu_results |>
-  pivot_wider(
-    names_from = Variable,
-    values_from = AlphaEU_CE,
-    names_prefix = "CE_"
-  ) |>
-  mutate(across(where(is.numeric), ~ round(., 2)))
-
-alpha_eu_table
-
-if (SAVE_OUTPUTS) {
-  write_csv(
-    alpha_eu_table,
-    "3_Outputs/Table_Results_AlphaEU_BroadFraming.csv"
-  )
-}
-
-# ===============================================================================
-# 6.0 Narrow Framing ===========================================================
-# ===============================================================================
-
-#-------------------------------------------------------------------------------
-## 6.0.1 calculate profits ------------------------------------------------------
-#-------------------------------------------------------------------------------
-
-# forward contracts
-profit_fc_nf <- CAN * (sim_f_p_forward - sim_f_p)
-profit_wfc_nf <- predicted_yield * (sim_w_p_forward - sim_w_p)
-profit_both_fc_nf <- CAN *
-  (sim_f_p_forward - sim_f_p) +
-  predicted_yield * (sim_w_p_forward - sim_w_p)
-
-# adjusted contract
-# Initialize result data frame
-df_profit_narrowframing <- data.frame(
-  f_fc = profit_fc_nf,
-  w_fc = profit_wfc_nf,
-  both_fc = profit_both_fc_nf
-)
-
-for (i in 1:nrow(premium_results)) {
-  k <- premium_results$strike_price[i]
-  contract_cost <- premium_results$option_premium[i]
-
-  profit_ac <- CAN * (pmax(sim_f_p - k, 0) - contract_cost)
-
-  # Add column with name fc_1, fc_2, etc.
-  col_name <- paste0("fc_", i)
-  df_profit_narrowframing[[col_name]] <- profit_ac
-}
-
-# Wheat put option: narrow framing payoff (per ha) ----
-# Uses predicted_yield (fixed) to isolate price risk,
-# consistent with CAN being fixed on the fertilizer side.
-for (j in 1:nrow(premium_results_w)) {
-  k_w <- premium_results_w$strike_price[j]
-  c_w <- premium_results_w$option_premium[j]
-
-  profit_wc_nf <- predicted_yield * (pmax(k_w - sim_w_p, 0) - c_w)
-
-  col_name <- paste0("wc_", j)
-  df_profit_narrowframing[[col_name]] <- profit_wc_nf
-}
-
-# Combined narrow framing: diagonal — fertilizer call i + wheat put i ----
-for (i in 1:nrow(premium_results)) {
-  k_f <- premium_results$strike_price[i]
-  c_f <- premium_results$option_premium[i]
-  k_w <- premium_results_w$strike_price[i]
-  c_w <- premium_results_w$option_premium[i]
-
-  profit_both_nf <- CAN *
-    (pmax(sim_f_p - k_f, 0) - c_f) +
-    predicted_yield * (pmax(k_w - sim_w_p, 0) - c_w)
-
-  col_name <- paste0("both_", i)
-  df_profit_narrowframing[[col_name]] <- profit_both_nf
-}
-
-df_profit_narrowframing
-
-# summary table
-summary_profits_narrowframing <- df_profit_narrowframing |>
-  pivot_longer(everything(), names_to = "variable", values_to = "value") |>
-  group_by(variable) |>
-  summarise(
-    mean = mean(value),
-    median = median(value),
-    sd = sd(value),
-    min = min(value),
-    max = max(value)
-  ) |>
-  mutate(across(where(is.numeric), ~ round(., 2)))
-
-summary_profits_narrowframing
-
-if (SAVE_OUTPUTS) {
-  write_csv(
-    summary_profits_narrowframing,
-    "3_Outputs/Table_Results_Profits_NarrowFraming.csv"
-  )
-}
-
-#-------------------------------------------------------------------------------
-## 6.1 Expected Utility Theory (EUT) under narrow framing ----------------------
-#-------------------------------------------------------------------------------
-
-delta <- c(0, 0.0005, 0.0007, 0.001, 0.003)
-
-target_cols <- colnames(df_profit_narrowframing)
-
-# CE and RP with Mean-Variance approximation: CE = E[π] - (δ/2)·Var[π]
-eut_results_narrowframing <- compute_eut(df_profit_narrowframing, delta)
-
-# make table of results
-final_eut_table_narrowframing <- eut_results_narrowframing |>
-  pivot_wider(
-    names_from = Variable,
-    values_from = c(CertaintyEquivalent, RiskPremium),
-    names_sep = "_"
-  ) |>
-  mutate(across(where(is.numeric), ~ round(.x, 2)))
-
-# Reorder columns to group CE and RP by contract
-contract_columns <- c()
-for (contract in target_cols) {
-  contract_columns <- c(
-    contract_columns,
-    paste0("CertaintyEquivalent_", contract),
-    paste0("RiskPremium_", contract)
-  )
-}
-
-final_eut_table_narrowframing <- final_eut_table_narrowframing |>
-  dplyr::select(Delta, all_of(contract_columns))
-
-# rename columns
-colnames(final_eut_table_narrowframing) <- c(
-  "Delta",
-  unlist(lapply(target_cols, function(x) c(paste0(x, "_CE"), paste0(x, "_RP"))))
-)
-
-final_eut_table_narrowframing
-
-if (SAVE_OUTPUTS) {
-  write_csv(
-    final_eut_table_narrowframing,
-    "3_Outputs/Table_Results_EUT_NarrowFraming.csv"
-  )
-}
-
-#-------------------------------------------------------------------------------
-## 6.2 Cumulative Prospect Theory (CPT) under narrow framing -------------------
-#-------------------------------------------------------------------------------
-
-ref_point_narrow <- 0
-
-cpt_results_nf <- compute_cpt(
-  df_profit_narrowframing,
-  ref_point_narrow,
-  a_values,
-  lambda,
-  gamma
-)
-
-#-------------------------------------------------------------------------------
-### 6.2.1 display CPT results --------------------------------------------------
-#-------------------------------------------------------------------------------
-
-# standard assumptions
-alpha_std <- 0.334
-lambda_std <- 1.574
-gamma_std <- 0.571
-
-# standard scenario
-std_row <- cpt_results_nf |>
-  filter(
-    Alpha == alpha_std,
-    Lambda == lambda_std,
-    Gamma == gamma_std
-  ) |>
-  dplyr::select(Variable, CPT_Value) |>
-  pivot_wider(
-    names_from = Variable,
-    values_from = CPT_Value
-  ) |>
-  mutate(Scenario = "Standard Assumptions")
-
-# varying risk aversion
-alpha_rows <- cpt_results_nf |>
-  filter(
-    Alpha != alpha_std,
-    Lambda == lambda_std,
-    Gamma == gamma_std
-  ) |>
-  dplyr::select(Alpha, Variable, CPT_Value) |>
-  pivot_wider(
-    names_from = Variable,
-    values_from = CPT_Value
-  ) |>
-  rename(Scenario = Alpha) |>
-  mutate(Scenario = paste0("Alpha = ", Scenario))
-
-# varying loss aversion
-lambda_rows <- cpt_results_nf |>
-  filter(
-    Alpha == alpha_std,
-    Lambda != lambda_std,
-    Gamma == gamma_std
-  ) |>
-  dplyr::select(Lambda, Variable, CPT_Value) |>
-  pivot_wider(
-    names_from = Variable,
-    values_from = CPT_Value
-  ) |>
-  rename(Scenario = Lambda) |>
-  mutate(Scenario = paste0("Lambda = ", Scenario))
-
-# varying prob weighting
-gamma_rows <- cpt_results_nf |>
-  filter(
-    Alpha == alpha_std,
-    Lambda == lambda_std,
-    Gamma != gamma_std
-  ) |>
-  dplyr::select(Gamma, Variable, CPT_Value) |>
-  pivot_wider(
-    names_from = Variable,
-    values_from = CPT_Value
-  ) |>
-  rename(Scenario = Gamma) |>
-  mutate(Scenario = paste0("Gamma = ", Scenario))
-
-# combine
-final_cpt_narrowframing <- bind_rows(
-  std_row,
-  alpha_rows,
-  lambda_rows,
-  gamma_rows
-) |>
-  relocate(Scenario) |>
-  mutate(across(where(is.numeric), ~ round(., 2)))
-
-final_cpt_narrowframing
-
-if (SAVE_OUTPUTS) {
-  write_csv(
-    final_cpt_narrowframing,
-    "3_Outputs/Table_Results_CPT_NarrowFraming.csv"
-  )
-}
-
-#-------------------------------------------------------------------------------
-## 6.3 Alpha-EU under narrow framing -------------------------------------------
-#-------------------------------------------------------------------------------
-
-# Empirical probability of the adverse state (payoff < 0) under forward contract
-p_hat_nf <- mean(df_profit_narrowframing$f_fc < ref_point_narrow)
-
-# Belief bounds on Pr(low) centered on empirical frequency
-p_intervals_nf <- list(
-  c(max(p_hat_nf - 0.20, 0), min(p_hat_nf + 0.20, 1)),
-  c(max(p_hat_nf - 0.10, 0), min(p_hat_nf + 0.10, 1)),
-  c(max(p_hat_nf - 0.05, 0), min(p_hat_nf + 0.05, 1))
-)
-
-alpha_eu_results_nf <- compute_alpha_eu(
-  df_profit_narrowframing,
-  ref_point_narrow,
-  delta_amb,
-  alpha_amb,
-  p_intervals_nf
-)
-
-# Pivot to wide format: one row per (Delta, Alpha, P_interval), columns = scenarios
-alpha_eu_table_nf <- alpha_eu_results_nf |>
-  pivot_wider(
-    names_from = Variable,
-    values_from = AlphaEU_CE,
-    names_prefix = "CE_"
-  ) |>
-  mutate(across(where(is.numeric), ~ round(., 2)))
-
-alpha_eu_table_nf
-
-if (SAVE_OUTPUTS) {
-  write_csv(
-    alpha_eu_table_nf,
-    "3_Outputs/Table_Results_AlphaEU_NarrowFraming.csv"
-  )
-}
-
-# ===============================================================================
-# 7.0 MULTI-FARM SIMULATION ====================================================
-# ===============================================================================
 
 # Link to location-specific yields from EPIC when we get the data. For now farm
 # heterogeneity comes from varying nitrogen application rates (N).
@@ -2563,7 +1513,7 @@ N_farms <- rnorm(n_farms, mean = N_mean, sd = N_sd)
 N_farms <- pmax(pmin(N_farms, N_max), N_min)
 
 # -------------------------------------------------------------------------------
-## 7.0.1 Vectorized farm parameters (vectors of length n_farms) -----------------
+## 5.0.1 Vectorized farm parameters (vectors of length n_farms) -----------------
 # -------------------------------------------------------------------------------
 
 CAN_farms <- N_farms / 0.27 / 1000
@@ -2573,7 +1523,7 @@ pred_yield_farms <- coeff_0_yield +
 pred_sigma_farms <- coeff_0_varf + coeff_1_varf * sqrt(N_farms)
 
 # -------------------------------------------------------------------------------
-## 7.0.2 Vectorized yield simulation (Ns x n_farms matrix) ----------------------
+## 5.0.2 Vectorized yield simulation (Ns x n_farms matrix) ----------------------
 # -------------------------------------------------------------------------------
 
 # Each column is one farm's Ns (Number of simulations) yield draws
@@ -2583,7 +1533,7 @@ sim_yield_mat <- sweep(sim_yield_mat, 2, pred_sigma_farms, "*")
 sim_yield_mat <- sweep(sim_yield_mat, 2, pred_yield_farms, "+")
 
 # -------------------------------------------------------------------------------
-## 7.0.3 Vectorized profit matrices (Ns x n_farms each) -------------------------
+## 5.0.3 Vectorized profit matrices (Ns x n_farms each) -------------------------
 # -------------------------------------------------------------------------------
 
 # Price vectors (drop the single-year matrix dimension to plain vectors)
@@ -2695,7 +1645,48 @@ for (i in 1:n_strikes) {
 }
 
 # ------------------------------------------------------------------------------
-## 7.0.4 Vectorized EUT  -------------------------------------------------------
+## 5.0.3.1 Multi-farm profit summary statistics --------------------------------
+# ------------------------------------------------------------------------------
+
+# Broad framing: for each scenario, pool all (Ns x n_farms) profit values
+broad_profit_summary <- map_dfr(broad_names, function(s) {
+  x <- as.vector(broad_mats[[s]])
+  tibble(
+    scenario = s,
+    mean = mean(x), median = median(x), sd = sd(x),
+    min = min(x), max = max(x),
+    skewness = moments::skewness(x),
+    q05 = quantile(x, 0.05), q25 = quantile(x, 0.25),
+    q75 = quantile(x, 0.75), q95 = quantile(x, 0.95)
+  )
+}) |> mutate(across(where(is.numeric), ~ round(., 2)))
+
+# Narrow framing
+narrow_profit_summary <- map_dfr(narrow_names, function(s) {
+  x <- as.vector(narrow_mats[[s]])
+  tibble(
+    scenario = s,
+    mean = mean(x), median = median(x), sd = sd(x),
+    min = min(x), max = max(x),
+    skewness = moments::skewness(x),
+    q05 = quantile(x, 0.05), q25 = quantile(x, 0.25),
+    q75 = quantile(x, 0.75), q95 = quantile(x, 0.95)
+  )
+}) |> mutate(across(where(is.numeric), ~ round(., 2)))
+
+if (SAVE_OUTPUTS) {
+  write_csv(
+    broad_profit_summary,
+    "3_Outputs/Table_MultiFarm_ProfitStats_BroadFraming.csv"
+  )
+  write_csv(
+    narrow_profit_summary,
+    "3_Outputs/Table_MultiFarm_ProfitStats_NarrowFraming.csv"
+  )
+}
+
+# ------------------------------------------------------------------------------
+## 5.0.4 Vectorized EUT  -------------------------------------------------------
 # ------------------------------------------------------------------------------
 
 # EUT CE = mean - (delta/2) * var, computed directly from profit matrices.
@@ -2754,7 +1745,7 @@ eut_narrow_all <- compute_eut_vectorized(
 )
 
 # -------------------------------------------------------------------------------
-## 7.0.5 Fast CPT for multi-farm ----------------------------------------
+## 5.0.5 Fast CPT for multi-farm ----------------------------------------
 # -------------------------------------------------------------------------------
 
 # CPT value for a single sorted numeric vector (base R only)
@@ -2838,7 +1829,7 @@ compute_cpt_multifarm <- function(
 }
 
 # -------------------------------------------------------------------------------
-## 7.0.6 Alpha-EU for multi-farm -------------------------------------------
+## 5.0.6 Alpha-EU for multi-farm -------------------------------------------
 # -------------------------------------------------------------------------------
 
 compute_alpha_eu_multifarm <- function(
@@ -2847,11 +1838,11 @@ compute_alpha_eu_multifarm <- function(
   ref_vecs,
   delta_values,
   alpha_values,
-  p_interval_offsets,
+  amb_halfwidths,
   N_farms,
   n_farms
 ) {
-  # p_interval_offsets: vector of half-widths, e.g. c(0.20, 0.10, 0.05)
+  # amb_halfwidths: quantile half-widths for cross-farm ambiguity sets
   # ref_vecs: numeric vector length n_farms
   results <- list()
   idx <- 0L
@@ -2859,6 +1850,7 @@ compute_alpha_eu_multifarm <- function(
   for (d in delta_values) {
     for (s in scenario_names) {
       mat <- profit_mats[[s]] # Ns x n_farms
+      Ns_obs <- nrow(mat)
 
       # Pre-compute per-farm EU for high and low states
       eu_high <- numeric(n_farms)
@@ -2877,8 +1869,13 @@ compute_alpha_eu_multifarm <- function(
         eu_low[f] <- if (length(lo) > 0) mean(-exp(-d * lo)) else NA
       }
 
+      # Cross-farm distribution of p_hat
+      p_hat_all <- n_low / Ns_obs  # vector length n_farms
+
       for (a in alpha_values) {
-        for (hw in p_interval_offsets) {
+        for (hw in amb_halfwidths) {
+          p_min <- quantile(p_hat_all, 0.5 - hw)
+          p_max <- quantile(p_hat_all, 0.5 + hw)
           ce_vec <- numeric(n_farms)
 
           for (f in 1:n_farms) {
@@ -2886,9 +1883,6 @@ compute_alpha_eu_multifarm <- function(
               eu_s <- if (!is.na(eu_high[f])) eu_high[f] else eu_low[f]
               ce_vec[f] <- -log(-eu_s) / d
             } else {
-              p_hat_f <- n_low[f] / (n_low[f] + n_high[f])
-              p_min <- max(p_hat_f - hw, 0)
-              p_max <- min(p_hat_f + hw, 1)
               eu_at_pmin <- p_min * eu_low[f] + (1 - p_min) * eu_high[f]
               eu_at_pmax <- p_max * eu_low[f] + (1 - p_max) * eu_high[f]
               alpha_eu_val <- a * eu_at_pmax + (1 - a) * eu_at_pmin
@@ -2896,7 +1890,7 @@ compute_alpha_eu_multifarm <- function(
             }
           }
 
-          p_label <- paste0("[", hw, "]")
+          p_label <- paste0("[", 0.5 - hw, "-", 0.5 + hw, "]")
           idx <- idx + 1L
           results[[idx]] <- data.frame(
             Variable = s,
@@ -2915,8 +1909,18 @@ compute_alpha_eu_multifarm <- function(
 }
 
 # -------------------------------------------------------------------------------
-## 7.0.7 Run CPT and Alpha-EU across all farms ----------------------------------
+## 5.0.7 Run CPT and Alpha-EU across all farms ----------------------------------
 # -------------------------------------------------------------------------------
+
+# Behavioral parameters for CPT and alpha-EU
+a_values <- c(0.1, 0.334, 0.5)
+lambda <- c(0.5, 1.574, 2)
+gamma <- c(0.4, 0.571, 0.7)
+alpha_amb <- c(0.1, 0.5, 0.9)
+delta_amb <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005)
+# Ambiguity half-widths: quantile range around median of cross-farm p_hat distribution
+# hw=0.45 → 5th-95th pct (high ambiguity), hw=0.25 → IQR (medium), hw=0.05 → 45th-55th (low)
+amb_halfwidths <- c(0.45, 0.25, 0.05)
 
 # Broad framing reference points: per-farm mean of fc profits
 ref_broad_farms <- colMeans(broad_mats[["both_fc"]])
@@ -2938,7 +1942,7 @@ alphaeu_broad_all <- compute_alpha_eu_multifarm(
   ref_broad_farms,
   delta_amb,
   alpha_amb,
-  c(0.20, 0.10, 0.05),
+  amb_halfwidths,
   N_farms,
   n_farms
 )
@@ -2963,13 +1967,13 @@ alphaeu_narrow_all <- compute_alpha_eu_multifarm(
   ref_narrow_farms,
   delta_amb,
   alpha_amb,
-  c(0.20, 0.10, 0.05),
+  amb_halfwidths,
   N_farms,
   n_farms
 )
 
 # -------------------------------------------------------------------------------
-## 7.2 Summary statistics across farms -------------------------------------------
+## 5.2 Summary statistics across farms -------------------------------------------
 # -------------------------------------------------------------------------------
 
 eut_broad_summary <- eut_broad_all |>
@@ -3057,7 +2061,7 @@ alphaeu_narrow_summary <- alphaeu_narrow_all |>
   mutate(across(where(is.numeric), ~ round(., 2)))
 
 # -------------------------------------------------------------------------------
-## 7.3 Save outputs --------------------------------------------------------------
+## 5.3 Save outputs --------------------------------------------------------------
 # -------------------------------------------------------------------------------
 
 if (SAVE_OUTPUTS) {
@@ -3082,7 +2086,7 @@ if (SAVE_OUTPUTS) {
 }
 
 # -------------------------------------------------------------------------------
-## 7.4 Distribution plots -------------------------------------------------------
+## 5.4 Distribution plots -------------------------------------------------------
 # -------------------------------------------------------------------------------
 library(ggridges)
 # EUT certainty equivalents under broad framing — one delta value
