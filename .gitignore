@@ -4,6 +4,9 @@
 .RData
 .Ruserdata
 
+# uncompressed EPIC dataset
+1_Data/Germany_EPIC.csv
+
 # Claude
 .claude
 CLAUDE.md

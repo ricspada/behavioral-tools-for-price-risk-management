@@ -32,7 +32,7 @@ set.seed(1234)
 
 #sim_yield <- read_csv("1_Data/EPIC.csv")
 
-sim_yield <- read_csv("1_Data/Germany_EPIC.csv")
+sim_yield <- read_csv("1_Data/Germany_EPIC.csv.gz")
 
 
 sim_yield <- sim_yield |>
