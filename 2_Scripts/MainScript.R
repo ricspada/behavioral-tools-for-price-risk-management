@@ -13,9 +13,11 @@ library(moments)
 library(RColorBrewer)
 #library(stargazer)
 library(strucchange)
+library(ggridges)
+library(fixest)
 
 # Toggle to enable/disable writing output files (CSV tables, PDF figures)
-SAVE_OUTPUTS <- TRUE
+SAVE_OUTPUTS <- FALSE
 
 # Set seed for replicability
 set.seed(1234)
@@ -28,14 +30,15 @@ set.seed(1234)
 ## 1.1 Get data from crop simulation model -------------------------------------
 #-------------------------------------------------------------------------------
 
-sim_yield <- read_csv("1_Data/EPIC.csv")
+#sim_yield <- read_csv("1_Data/EPIC.csv")
+
+sim_yield <- read_csv("1_Data/Germany_EPIC.csv")
+
 
 sim_yield <- sim_yield |>
   filter(
     # winter wheat only
     CROP == "WWHT",
-    # grid location of interest (alternative: 52339)
-    SimUID == 52338,
     # exlude alternative weather scenario pathways
     WTH == "hist"
   ) |>
@@ -43,6 +46,12 @@ sim_yield <- sim_yield |>
     YLD = YLD_DM / 0.88, # convert dry matter yield to economic yield (12% moisture content)
     FTN = round(FTN)
   )
+
+length(unique(sim_yield$SimUID))
+
+sim_yield |>
+  group_by(SimUID) |>
+  summarise(n_obs = n())
 
 # plot the distribution of yields
 ggplot(sim_yield, aes(x = YLD)) +
@@ -131,22 +140,22 @@ summary <- sim_yield |>
   mutate(across(where(is.numeric), ~ round(., 2)))
 
 summary
-# future wheater scenarios only simulate yield for FTN = 180, should we keep
-# or exlude them from the estimation? (the benefit is to introduce stochasticity)
+
+selected_summary <- summary |>
+  filter(FTN %in% c(10, 50, 100, 180, 250))
 
 if (SAVE_OUTPUTS) {
-  write_csv(summary, "3_Outputs/Table_YieldSummary.csv")
+  write_csv(selected_summary, "3_Outputs/Table_YieldSummary.csv")
 }
 
 #-------------------------------------------------------------------------------
 ## 1.2 Just & Pope production function estimation ------------------------------
 #-------------------------------------------------------------------------------
 
-# Weather and rotation dummies are excluded because the downstream simulation
-# uses a fixed management scenario (rainfed, conventional tillage); their
-# effects are captured in the residual variance.
-# The EPIC simulation design varies these factors jointly.
-yield_function <- lmrob(
+# Weather and rotation dummies are excluded
+# Fixed-effects model: SimUID absorbs location-level heterogeneity (soil,
+# microclimate), providing empirical intercepts for the multi-farm simulation.
+yield_function <- feols(
   YLD ~ sqrt(FTN) +
     FTN +
     irr +
@@ -154,25 +163,25 @@ yield_function <- lmrob(
     til_contill_r00 +
     til_contill_r30 +
     til_contill_r60 +
-    til_contill_r90,
+    til_contill_r90 |
+    SimUID,
   data = sim_yield,
-  method = "MM"
+  vcov = "hetero"
 )
 
 summary(yield_function)
 
 # append residuals
-sim_yield <- sim_yield |>
-  mutate(residuals = yield_function$residuals, abs_residuals = abs(residuals))
+sim_yield$residuals <- residuals(yield_function)
+sim_yield$abs_residuals <- abs(sim_yield$residuals)
 
-residuals <- yield_function$residuals
-hist(residuals, breaks = 50)
-shapiro.test(sample(residuals, 500))
-skewness(residuals)
+res <- residuals(yield_function)
+hist(res, breaks = 50)
+shapiro.test(sample(res, 500))
+skewness(res)
 
-# Variation function estimation
-# Using absolute residuals (not squared) as the dependent variable.
-variation_function <- lmrob(
+# Variation function estimation (same FE structure)
+variation_function <- feols(
   abs_residuals ~ sqrt(FTN) +
     FTN +
     irr +
@@ -180,12 +189,17 @@ variation_function <- lmrob(
     til_contill_r00 +
     til_contill_r30 +
     til_contill_r60 +
-    til_contill_r90,
+    til_contill_r90 |
+    SimUID,
   data = sim_yield,
-  method = "MM"
+  vcov = "hetero"
 )
 
 summary(variation_function)
+
+# Extract location fixed effects for downstream multi-farm simulation
+fe_yield <- fixef(yield_function)$SimUID
+fe_varf <- fixef(variation_function)$SimUID
 
 # export table of results
 models <- list(
@@ -740,17 +754,19 @@ var_comparison <- as.data.frame(t(sapply(model_list, get_var_ic)))
 var_comparison$Model <- rownames(var_comparison)
 var_comparison <- var_comparison[, c("Model", "AIC", "BIC", "BG_pval")]
 rownames(var_comparison) <- NULL
+var_comparison$AIC <- round(as.numeric(var_comparison$AIC), 2)
+var_comparison$BIC <- round(as.numeric(var_comparison$BIC), 2)
+var_comparison$BG_pval <- round(as.numeric(var_comparison$BG_pval), 3)
 
 var_comparison
 
 # Best by BIC: VAR(1) baseline
 #
-# Squared lags (w_p1^2, f_p1^2) consistently improve fit and remove
-# serial correlation
+# VAR(1) + squared lags + D_shock best for information criteria but residual
+# autocorrelation still present
 #
 # Selected specification for QVAR:
-# VAR(1)
-# VAR(1) + squared lags
+# VAR(1) + D_shock
 
 if (SAVE_OUTPUTS) {
   write.csv(
@@ -1483,25 +1499,21 @@ if (SAVE_OUTPUTS) {
 ## 5.0.0 Parameters needed by multi-farm simulation ----------------------------
 # ------------------------------------------------------------------------------
 
-# Get coeff from production function regression
-# Only intercept + nitrogen coefficients are used, which implicitly predicts
-# for rainfed + conventional BAU tillage (the reference categories, where
-# irr = 0 and all tillage dummies = 0).
-coeff_0_yield <- yield_function$coefficients[1]
-coeff_1_yield <- yield_function$coefficients[2]
-coeff_2_yield <- yield_function$coefficients[3]
+# Get nitrogen coefficients from fixed-effects production function.
+# The intercept is now absorbed into per-location FEs (fe_yield / fe_varf),
+# so only slope coefficients are extracted here. Implicitly predicts for
+# rainfed + conventional BAU tillage (irr = 0, all tillage dummies = 0).
+coeff_1_yield <- coef(yield_function)["sqrt(FTN)"]
+coeff_2_yield <- coef(yield_function)["FTN"]
 
-# Get coeff from variation function regression
-# Same reference scenario: rainfed + conventional BAU tillage.
-coeff_0_varf <- variation_function$coefficients[1]
-coeff_1_varf <- variation_function$coefficients[2]
+coeff_1_varf <- coef(variation_function)["sqrt(FTN)"]
+coeff_2_varf <- coef(variation_function)["FTN"]
 
 # Forward prices
 sim_f_p_forward <- rep(tail(f_data$Avg_Price, 1) * discount_factor, Ns)
 sim_w_p_forward <- rep(tail(w_data$Avg_Price, 1) * discount_factor_w, Ns)
 
-# Link to location-specific yields from EPIC when we get the data. For now farm
-# heterogeneity comes from varying nitrogen application rates (N).
+# Farm heterogeneity from varying N rates and empirical location fixed effects.
 n_farms <- 500
 N_mean <- 200
 N_sd <- 30
@@ -1509,18 +1521,24 @@ N_min <- 50
 N_max <- 350
 
 set.seed(5678)
-N_farms <- rnorm(n_farms, mean = N_mean, sd = N_sd)
-N_farms <- pmax(pmin(N_farms, N_max), N_min)
+N_farms <- pmax(pmin(rnorm(n_farms, N_mean, N_sd), N_max), N_min)
+
+# Sample location fixed effects (with replacement) from EPIC locations
+sampled_idx <- sample(length(fe_yield), n_farms, replace = TRUE)
+fe_yield_farms <- fe_yield[sampled_idx]
+fe_varf_farms <- fe_varf[sampled_idx]
 
 # -------------------------------------------------------------------------------
 ## 5.0.1 Vectorized farm parameters (vectors of length n_farms) -----------------
 # -------------------------------------------------------------------------------
 
 CAN_farms <- N_farms / 0.27 / 1000
-pred_yield_farms <- coeff_0_yield +
+pred_yield_farms <- fe_yield_farms +
   coeff_1_yield * sqrt(N_farms) +
   coeff_2_yield * N_farms
-pred_sigma_farms <- coeff_0_varf + coeff_1_varf * sqrt(N_farms)
+pred_sigma_farms <- fe_varf_farms +
+  coeff_1_varf * sqrt(N_farms) +
+  coeff_2_varf * N_farms
 
 # -------------------------------------------------------------------------------
 ## 5.0.2 Vectorized yield simulation (Ns x n_farms matrix) ----------------------
@@ -1653,26 +1671,38 @@ broad_profit_summary <- map_dfr(broad_names, function(s) {
   x <- as.vector(broad_mats[[s]])
   tibble(
     scenario = s,
-    mean = mean(x), median = median(x), sd = sd(x),
-    min = min(x), max = max(x),
+    mean = mean(x),
+    median = median(x),
+    sd = sd(x),
+    min = min(x),
+    max = max(x),
     skewness = moments::skewness(x),
-    q05 = quantile(x, 0.05), q25 = quantile(x, 0.25),
-    q75 = quantile(x, 0.75), q95 = quantile(x, 0.95)
+    q05 = quantile(x, 0.05),
+    q25 = quantile(x, 0.25),
+    q75 = quantile(x, 0.75),
+    q95 = quantile(x, 0.95)
   )
-}) |> mutate(across(where(is.numeric), ~ round(., 2)))
+}) |>
+  mutate(across(where(is.numeric), ~ round(., 2)))
 
 # Narrow framing
 narrow_profit_summary <- map_dfr(narrow_names, function(s) {
   x <- as.vector(narrow_mats[[s]])
   tibble(
     scenario = s,
-    mean = mean(x), median = median(x), sd = sd(x),
-    min = min(x), max = max(x),
+    mean = mean(x),
+    median = median(x),
+    sd = sd(x),
+    min = min(x),
+    max = max(x),
     skewness = moments::skewness(x),
-    q05 = quantile(x, 0.05), q25 = quantile(x, 0.25),
-    q75 = quantile(x, 0.75), q95 = quantile(x, 0.95)
+    q05 = quantile(x, 0.05),
+    q25 = quantile(x, 0.25),
+    q75 = quantile(x, 0.75),
+    q95 = quantile(x, 0.95)
   )
-}) |> mutate(across(where(is.numeric), ~ round(., 2)))
+}) |>
+  mutate(across(where(is.numeric), ~ round(., 2)))
 
 if (SAVE_OUTPUTS) {
   write_csv(
@@ -1870,7 +1900,7 @@ compute_alpha_eu_multifarm <- function(
       }
 
       # Cross-farm distribution of p_hat
-      p_hat_all <- n_low / Ns_obs  # vector length n_farms
+      p_hat_all <- n_low / Ns_obs # vector length n_farms
 
       for (a in alpha_values) {
         for (hw in amb_halfwidths) {
@@ -2088,12 +2118,12 @@ if (SAVE_OUTPUTS) {
 # -------------------------------------------------------------------------------
 ## 5.4 Distribution plots -------------------------------------------------------
 # -------------------------------------------------------------------------------
-library(ggridges)
+
 # EUT certainty equivalents under broad framing — one delta value
 plot_eut_broad_dist <- eut_broad_all |>
-  filter(Delta == 0.0001) |>
+  filter(Delta == 0.00001) |>
   ggplot(aes(x = CertaintyEquivalent, y = Variable)) +
-  geom_density_ridges_gradient(alpha = 0.4) +
+  geom_density_ridges(alpha = 0.4) +
   labs(
     title = "EUT Certainty Equivalents across farms (broad framing, delta = 0.0001)",
     x = "Certainty Equivalent (eur/ha)",
@@ -2145,6 +2175,34 @@ plot_cpt_narrow_dist <- cpt_narrow_all |>
 
 plot_cpt_narrow_dist
 
+# Alpha-EU certainty equivalents under broad framing
+plot_alphaeu_broad_dist <- alphaeu_broad_all |>
+  filter(Delta == 0.00001, Alpha == 0.5, P_interval == "[0.05-0.95]") |>
+  ggplot(aes(x = AlphaEU_CE, y = Variable)) +
+  geom_density_ridges(alpha = 0.4) +
+  labs(
+    title = "Alpha-EU Certainty Equivalents across farms (broad framing, delta = 0.00001, alpha = 0.5, P = [0.05-0.95])",
+    x = "Certainty Equivalent (eur/ha)",
+    y = "Density"
+  ) +
+  theme_minimal()
+
+plot_alphaeu_broad_dist
+
+# Alpha-EU certainty equivalents under narrow framing
+plot_alphaeu_narrow_dist <- alphaeu_narrow_all |>
+  filter(Delta == 0.001, Alpha == 0.5, P_interval == "[0.05-0.95]") |>
+  ggplot(aes(x = AlphaEU_CE, y = Variable)) +
+  geom_density_ridges(alpha = 0.4) +
+  labs(
+    title = "Alpha-EU Certainty Equivalents across farms (narrow framing, delta = 0.001, alpha = 0.5, P = [0.05-0.95])",
+    x = "Certainty Equivalent (eur/ha)",
+    y = "Density"
+  ) +
+  theme_ridges()
+
+plot_alphaeu_narrow_dist
+
 if (SAVE_OUTPUTS) {
   ggsave(
     "3_Outputs/Fig_MultiFarm_EUT_BroadFraming.pdf",
@@ -2167,6 +2225,18 @@ if (SAVE_OUTPUTS) {
   ggsave(
     "3_Outputs/Fig_MultiFarm_CPT_NarrowFraming.pdf",
     plot = plot_cpt_narrow_dist,
+    width = 14,
+    height = 10
+  )
+  ggsave(
+    "3_Outputs/Fig_MultiFarm_AlphaEU_BroadFraming.pdf",
+    plot = plot_alphaeu_broad_dist,
+    width = 14,
+    height = 10
+  )
+  ggsave(
+    "3_Outputs/Fig_MultiFarm_AlphaEU_NarrowFraming.pdf",
+    plot = plot_alphaeu_narrow_dist,
     width = 14,
     height = 10
   )
