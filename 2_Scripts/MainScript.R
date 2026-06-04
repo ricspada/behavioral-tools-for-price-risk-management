@@ -30,34 +30,19 @@ set.seed(1234)
 ## 1.1 Get data from crop simulation model -------------------------------------
 #-------------------------------------------------------------------------------
 
-#sim_yield <- read_csv("1_Data/EPIC.csv")
-
 sim_yield <- read_csv("1_Data/Germany_EPIC.csv.gz")
 
-
+# keep winter wheat only, and exclude alternative weather scenario pathways
+# convert dry matter yield to economic yield (12% moisture content)
 sim_yield <- sim_yield |>
   filter(
-    # winter wheat only
     CROP == "WWHT",
-    # exlude alternative weather scenario pathways
     WTH == "hist"
   ) |>
   mutate(
-    YLD = YLD_DM / 0.88, # convert dry matter yield to economic yield (12% moisture content)
+    YLD = YLD_DM / 0.88,
     FTN = round(FTN)
   )
-
-length(unique(sim_yield$SimUID))
-
-sim_yield |>
-  group_by(SimUID) |>
-  summarise(n_obs = n())
-
-# plot the distribution of yields
-ggplot(sim_yield, aes(x = YLD)) +
-  geom_histogram(binwidth = 0.1) +
-  labs(x = "Yield (t/ha)", y = "Frequency") +
-  theme_minimal()
 
 # create control variables
 sim_yield <- sim_yield |>
@@ -84,7 +69,7 @@ sim_yield <- sim_yield |>
     til_contill_r90 = ifelse(TIL == "contill_r90", 1, 0)
   )
 
-# descriptive statistics
+# full descriptive statistics
 sim_yield_summary <- sim_yield |>
   dplyr::select(
     YLD,
@@ -153,8 +138,7 @@ if (SAVE_OUTPUTS) {
 #-------------------------------------------------------------------------------
 
 # Weather and rotation dummies are excluded
-# Fixed-effects model: SimUID absorbs location-level heterogeneity (soil,
-# microclimate), providing empirical intercepts for the multi-farm simulation.
+# Fixed-effects model: SimUID absorbs location-level heterogeneity
 yield_function <- feols(
   YLD ~ sqrt(FTN) +
     FTN +
@@ -175,12 +159,7 @@ summary(yield_function)
 sim_yield$residuals <- residuals(yield_function)
 sim_yield$abs_residuals <- abs(sim_yield$residuals)
 
-res <- residuals(yield_function)
-hist(res, breaks = 50)
-shapiro.test(sample(res, 500))
-skewness(res)
-
-# Variation function estimation (same FE structure)
+# Variation function estimation
 variation_function <- feols(
   abs_residuals ~ sqrt(FTN) +
     FTN +
@@ -239,20 +218,8 @@ dat <- inner_join(w_data, f_data, by = "Date") |>
   filter(Date >= as.Date("2009-01-01")) |>
   mutate(w_p = log(w_p), f_p = log(f_p))
 
-range(dat$Date)
-diff(dat$Date)
-
-# check for time intervals that are not 14 days
-unique(diff(dat$Date))
-sum(diff(dat$Date) != 14)
-sum(diff(dat$Date) == 14)
-
-# we dont have regular 14-day intervals, data is recorder every 1st and 3rd
-# monday of the month (3 week gaps are introduced)
-
 # plot prices
 
-# consistent colors across plots
 colors <- c("darkblue", "darkgreen")
 
 price_plot <- ggplot(dat, aes(x = Date)) +
@@ -276,8 +243,6 @@ price_plot <- ggplot(dat, aes(x = Date)) +
   )
 
 price_plot
-
-# clear outlier in wheat prices, formally checkin for outliers
 
 # ------------------------------------------------------------------------------
 ## Outliers --------------------------------------------------------------------
@@ -452,18 +417,9 @@ if (SAVE_OUTPUTS) {
   )
 }
 
-# cointegration test
-coint_test <- ca.jo(
-  dat[, c("f_p", "w_p")],
-  type = "trace",
-  ecdet = "trend",
-  K = 2
-)
-summary(coint_test)
-# weak evidence of cointegration at 10% level
 
 #-------------------------------------------------------------------------------
-## 2.4 Summary statistics of differenced prices --------------------------------
+## 2.4 Summary statistics of prices --------------------------------------------
 #-------------------------------------------------------------------------------
 
 summary_price_table <- tibble(
@@ -685,7 +641,7 @@ get_var_ic <- function(mod) {
   c(AIC = aic, BIC = bic, BG_pval = unname(bg$serial$p.value))
 }
 
-# estimate candidate models
+# estimate models
 var_m1 <- VAR(vardat_endo, p = 1)
 var_m2 <- VAR(
   vardat_endo,
@@ -760,13 +716,10 @@ var_comparison$BG_pval <- round(as.numeric(var_comparison$BG_pval), 3)
 
 var_comparison
 
-# Best by BIC: VAR(1) baseline
+# Best by BIC: VAR(1) + squared lags + D_shock
 #
-# VAR(1) + squared lags + D_shock best for information criteria but residual
-# autocorrelation still present
-#
-# Selected specification for QVAR:
-# VAR(1) + D_shock
+# Selecting VAR(1) + D_shock
+# as QVAR altready capture non-linear dynamics
 
 if (SAVE_OUTPUTS) {
   write.csv(
@@ -781,8 +734,8 @@ if (SAVE_OUTPUTS) {
 #-------------------------------------------------------------------------------
 
 # define individual marginal specifications based on information criteria
-mf <- f_p ~ f_p1 + w_p1
-mw <- w_p ~ f_p1 + w_p1
+mf <- f_p ~ f_p1 + w_p1 + D_shock
+mw <- w_p ~ f_p1 + w_p1 + D_shock
 
 # var estimation
 var_f <- lm(mf, data = var_dat)
@@ -875,8 +828,9 @@ w_p1 <- var_dat$w_p1
 
 f_p <- var_dat$f_p
 f_p1 <- var_dat$f_p1
+D_shock_hist <- var_dat$D_shock
 
-X <- cbind(1, f_p1, w_p1)
+X <- cbind(1, f_p1, w_p1, D_shock_hist)
 
 # Get inverse distributions to build the copula
 y_w <- X %*% coeff_w
@@ -999,10 +953,8 @@ set.seed(1234)
 
 n_dif <- nrow(dif_dat)
 n_lev <- nrow(dat)
-
 # number of periods to simulate (24 observations twice per month = 1 year)
 Nt <- 24
-
 # number of draws
 Ns <- 1000
 
@@ -1014,25 +966,33 @@ Ns <- 1000
 Ys_changes <- array(0, dim = c(2, Nt, Ns))
 Ys_levels <- array(0, dim = c(2, Nt, Ns))
 
-Ys_changes[1, 1, ] <- dif_dat$f_p[n_dif] # last observed fertilizer change at t=1
-Ys_changes[2, 1, ] <- dif_dat$w_p[n_dif] # last observed wheat change at t=1
+# zero initial change (mean of stationary differences ≈ 0)
+Ys_changes[1, 1, ] <- 0
+Ys_changes[2, 1, ] <- 0
 
-# set initial level (only at time 1)
-Ys_levels[1, 1, ] <- dat$f_p[n_lev] # last observed fertilizer level
-Ys_levels[2, 1, ] <- dat$w_p[n_lev] # last observed wheat level
+# set initial level to sample mean (geometric mean of raw prices)
+f_p_start <- mean(dat$f_p)
+w_p_start <- mean(dat$w_p)
+Ys_levels[1, 1, ] <- f_p_start
+Ys_levels[2, 1, ] <- w_p_start
 
-# Copula Simulation
+# Simulation based on marginal distributions
 for (it in 2:Nt) {
   for (is in 1:Ns) {
     f_change1 <- Ys_changes[1, it - 1, is]
     w_change1 <- Ys_changes[2, it - 1, is]
 
-    Xfi <- cbind(1, f_change1, w_change1) # matches mf: intercept, f_p1, w_p1
-    Xwi <- cbind(1, f_change1, w_change1) # matches mw: intercept, f_p1, w_p1
+    # D_shock = 0 post-shock
+    Xfi <- cbind(1, f_change1, w_change1, 0)
+    Xwi <- cbind(1, f_change1, w_change1, 0)
 
-    # Draw independent marginal quantiles
+    # Draw fertilizer marginal quantile, then wheat conditional on it via copula
     qi_f <- sample(1:99, 1)
-    qi_w <- sample(1:99, 1)
+    u_f <- taus_dense[qi_f]
+    v <- sample(1:99, 1)
+    F_w_pred <- coeff_rC[1, v] + coeff_rC[2, v] * u_f
+    F_w_pred <- max(taus_dense[1], min(taus_dense[99], F_w_pred))
+    qi_w <- which.min(abs(taus_dense - F_w_pred))
 
     yf_change <- Xfi %*% coeff_f[, qi_f]
     yw_change <- Xwi %*% coeff_w[, qi_w]
@@ -1041,8 +1001,8 @@ for (it in 2:Nt) {
     Ys_changes[2, it, is] <- yw_change
 
     # convert to level using cumulative sum
-    Ys_levels[1, it, is] <- dat$f_p[n_lev] + sum(Ys_changes[1, 1:it, is])
-    Ys_levels[2, it, is] <- dat$w_p[n_lev] + sum(Ys_changes[2, 1:it, is])
+    Ys_levels[1, it, is] <- f_p_start + sum(Ys_changes[1, 1:it, is])
+    Ys_levels[2, it, is] <- w_p_start + sum(Ys_changes[2, 1:it, is])
   }
 }
 
@@ -1059,164 +1019,166 @@ simulated_prices <- data.frame(
   simulation = rep(1:Ns, each = Nt)
 )
 
-ggplot(simulated_prices, aes(x = time, y = price_f, group = simulation)) +
-  geom_line(color = "blue", alpha = 0.5) +
-  labs(y = "Log of Fertilizer Price", x = "Time Period") +
-  theme_minimal()
+# Historical prices in level form (same space as simulation output)
+dat_level <- dat |>
+  mutate(f_p_level = exp(f_p), w_p_level = exp(w_p))
 
-ggplot(simulated_prices, aes(x = time, y = price_w, group = simulation)) +
-  geom_line(color = "orange", alpha = 0.5) +
-  labs(y = "Log of Wheat Price", x = "Time Period") +
-  theme_minimal()
+# Future date axis: 24 biweekly periods from last historical date
+last_date <- max(dat$Date)
+sim_dates <- seq(last_date, by = "2 weeks", length.out = Nt + 1)[-1]
 
-# density distributions vs historical prices
-density_plot_f <- ggplot() +
+# Per-period quantile summary of simulated paths
+sim_fan <- simulated_prices |>
+  group_by(time) |>
+  summarise(
+    q10_f = quantile(price_f_level, 0.10),
+    q25_f = quantile(price_f_level, 0.25),
+    q50_f = quantile(price_f_level, 0.50),
+    q75_f = quantile(price_f_level, 0.75),
+    q90_f = quantile(price_f_level, 0.90),
+    q10_w = quantile(price_w_level, 0.10),
+    q25_w = quantile(price_w_level, 0.25),
+    q50_w = quantile(price_w_level, 0.50),
+    q75_w = quantile(price_w_level, 0.75),
+    q90_w = quantile(price_w_level, 0.90),
+    .groups = "drop"
+  ) |>
+  mutate(Date = sim_dates)
+
+# Shared y-axis limits per commodity
+ylim_f <- range(c(dat_level$f_p_level, simulated_prices$price_f_level))
+ylim_w <- range(c(dat_level$w_p_level, simulated_prices$price_w_level))
+
+# Fertilizer plot
+
+p_ts_f <- ggplot() +
+  geom_ribbon(
+    data = sim_fan,
+    aes(x = Date, ymin = q10_f, ymax = q90_f),
+    fill = "#E41A1C",
+    alpha = 0.15
+  ) +
+  geom_ribbon(
+    data = sim_fan,
+    aes(x = Date, ymin = q25_f, ymax = q75_f),
+    fill = "#E41A1C",
+    alpha = 0.25
+  ) +
+  geom_line(
+    data = sim_fan,
+    aes(x = Date, y = q50_f),
+    color = "#E41A1C",
+    linewidth = 0.5
+  ) +
+  geom_line(
+    data = dat_level,
+    aes(x = Date, y = f_p_level),
+    color = "darkblue",
+    linewidth = 0.5
+  ) +
+  coord_cartesian(ylim = ylim_f) +
+  labs(x = NULL, y = "CAN price (€/t)") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+
+p_dens_f <- ggplot() +
   geom_density(
     data = simulated_prices,
     aes(x = price_f_level, fill = "Simulated"),
     alpha = 0.5
   ) +
   geom_density(
-    data = f_data,
-    aes(x = Avg_Price, fill = "Historical"),
+    data = dat_level,
+    aes(x = f_p_level, fill = "Historical"),
     alpha = 0.4
   ) +
   scale_fill_manual(
     name = NULL,
-    values = c("Simulated" = "#E41A1C", "Historical" = "#377EB8")
+    values = c("Simulated" = "#E41A1C", "Historical" = "darkblue")
   ) +
-  labs(
-    x = paste0("\nN = ", nrow(simulated_prices)),
-    y = "Density\n",
-    title = "CAN Price Distribution"
-  ) +
+  coord_flip(xlim = ylim_f) +
+  labs(x = "Density", y = NULL) +
   theme_minimal() +
   theme(
-    legend.position = c(0.85, 0.85),
-    legend.background = element_rect(fill = "white", color = "black"),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank()
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    legend.position = c(0.8, 0.85),
+    legend.background = element_rect(fill = "white", color = "black")
   )
 
-density_plot_w <- ggplot() +
+fig_f <- p_ts_f | p_dens_f
+
+# Wheat plot
+
+p_ts_w <- ggplot() +
+  geom_ribbon(
+    data = sim_fan,
+    aes(x = Date, ymin = q10_w, ymax = q90_w),
+    fill = "#E41A1C",
+    alpha = 0.15
+  ) +
+  geom_ribbon(
+    data = sim_fan,
+    aes(x = Date, ymin = q25_w, ymax = q75_w),
+    fill = "#E41A1C",
+    alpha = 0.25
+  ) +
+  geom_line(
+    data = sim_fan,
+    aes(x = Date, y = q50_w),
+    color = "#E41A1C",
+    linewidth = 0.5
+  ) +
+  geom_line(
+    data = dat_level,
+    aes(x = Date, y = w_p_level),
+    color = "darkgreen",
+    linewidth = 0.5
+  ) +
+  coord_cartesian(ylim = ylim_w) +
+  labs(x = NULL, y = "Wheat price (€/t)") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+
+p_dens_w <- ggplot() +
   geom_density(
     data = simulated_prices,
     aes(x = price_w_level, fill = "Simulated"),
     alpha = 0.5
   ) +
   geom_density(
-    data = w_data,
-    aes(x = Avg_Price, fill = "Historical"),
+    data = dat_level,
+    aes(x = w_p_level, fill = "Historical"),
     alpha = 0.4
   ) +
   scale_fill_manual(
     name = NULL,
-    values = c("Simulated" = "#E41A1C", "Historical" = "#377EB8")
+    values = c("Simulated" = "#E41A1C", "Historical" = "darkgreen")
   ) +
-  labs(
-    x = paste0("\nN = ", nrow(simulated_prices)),
-    y = "Density\n",
-    title = "Wheat Price Distribution"
-  ) +
+  coord_flip(xlim = ylim_w) +
+  labs(x = "Density", y = NULL) +
   theme_minimal() +
   theme(
-    legend.position = c(0.85, 0.85),
-    legend.background = element_rect(fill = "white", color = "black"),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank()
-  )
-
-density_plot_f
-density_plot_w
-
-if (SAVE_OUTPUTS) {
-  ggsave(
-    "3_Outputs/Fig_PriceDensity_CAN.pdf",
-    plot = density_plot_f,
-    width = 10,
-    height = 6
-  )
-  ggsave(
-    "3_Outputs/Fig_PriceDensity_Wheat.pdf",
-    plot = density_plot_w,
-    width = 10,
-    height = 6
-  )
-}
-
-# density distributions vs deflated historical prices
-density_plot_f_deflated <- ggplot() +
-  geom_density(
-    data = simulated_prices,
-    aes(x = price_f_level, fill = "Simulated prices"),
-    alpha = 0.5
-  ) +
-  geom_density(
-    data = defl_f_p,
-    aes(x = real_f_p, fill = "Deflated historical prices"),
-    alpha = 0.4
-  ) +
-  scale_fill_manual(
-    name = NULL,
-    values = c(
-      "Simulated prices" = "#E41A1C",
-      "Deflated historical prices" = "#377EB8"
-    )
-  ) +
-  labs(
-    x = paste0("\n(eur/t), N = ", nrow(simulated_prices)),
-    y = "Density\n",
-    title = "CAN Price Distributions"
-  ) +
-  theme_minimal() +
-  theme(
-    legend.position = "null",
-    legend.background = element_rect(fill = "white", color = "black"),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank()
-  ) +
-  coord_cartesian(ylim = c(0, 0.025))
-
-density_plot_w_deflated <- ggplot() +
-  geom_density(
-    data = simulated_prices,
-    aes(x = price_w_level, fill = "Simulated prices"),
-    alpha = 0.5
-  ) +
-  geom_density(
-    data = defl_w_p,
-    aes(x = real_w_p, fill = "Deflated historical prices"),
-    alpha = 0.4
-  ) +
-  scale_fill_manual(
-    name = NULL,
-    values = c(
-      "Simulated prices" = "#E41A1C",
-      "Deflated historical prices" = "#377EB8"
-    )
-  ) +
-  labs(
-    x = paste0("\n(eur/t), N = ", nrow(simulated_prices)),
-    y = NULL,
-    title = "Wheat Price Distributions"
-  ) +
-  theme_minimal() +
-  theme(
-    legend.position = c(0.7, 0.85),
-    legend.background = element_rect(fill = "white", color = "black"),
-    panel.grid.major.x = element_blank(),
     panel.grid.minor = element_blank(),
-    axis.text.y = element_blank()
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    legend.position = c(0.8, 0.85),
+    legend.background = element_rect(fill = "white", color = "black")
   )
 
-deflated_density_plot <- density_plot_f_deflated | density_plot_w_deflated
+fig_w <- p_ts_w | p_dens_w
+
+plot_sim_prices <- fig_f / fig_w
+
+plot_sim_prices
 
 if (SAVE_OUTPUTS) {
   ggsave(
-    "3_Outputs/Fig_PriceDensity_deflated.pdf",
-    plot = deflated_density_plot,
+    "3_Outputs/Fig_SimulationFan.pdf",
+    plot_sim_prices,
     width = 10,
-    height = 6
+    height = 4
   )
 }
 
