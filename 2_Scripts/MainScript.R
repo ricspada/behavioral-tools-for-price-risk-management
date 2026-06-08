@@ -176,10 +176,6 @@ variation_function <- feols(
 
 summary(variation_function)
 
-# Extract location fixed effects for downstream multi-farm simulation
-fe_yield <- fixef(yield_function)$SimUID
-fe_varf <- fixef(variation_function)$SimUID
-
 # export table of results
 models <- list(
   "Yield function" = yield_function,
@@ -1461,40 +1457,38 @@ if (SAVE_OUTPUTS) {
 ## 5.0.0 Parameters needed by multi-farm simulation ----------------------------
 # ------------------------------------------------------------------------------
 
-# Get nitrogen coefficients from fixed-effects production function.
-# The intercept is now absorbed into per-location FEs (fe_yield / fe_varf),
-# so only slope coefficients are extracted here. Implicitly predicts for
-# rainfed + conventional BAU tillage (irr = 0, all tillage dummies = 0).
+# Get nitrogen coefficients from production function.
+fe_yield <- fixef(yield_function)$SimUID
+fe_varf <- fixef(variation_function)$SimUID
+
 coeff_1_yield <- coef(yield_function)["sqrt(FTN)"]
 coeff_2_yield <- coef(yield_function)["FTN"]
 
 coeff_1_varf <- coef(variation_function)["sqrt(FTN)"]
 coeff_2_varf <- coef(variation_function)["FTN"]
 
-# Forward prices
-sim_f_p_forward <- rep(tail(f_data$Avg_Price, 1) * discount_factor, Ns)
-sim_w_p_forward <- rep(tail(w_data$Avg_Price, 1) * discount_factor_w, Ns)
+# Forward prices: risk-neutral expectation E[S_T] from the simulation
+sim_f_p_forward <- rep(mean(sim_f_p), Ns)
+sim_w_p_forward <- rep(mean(sim_w_p), Ns)
 
-# Farm heterogeneity from varying N rates and empirical location fixed effects.
-n_farms <- 500
-N_mean <- 200
-N_sd <- 30
-N_min <- 50
-N_max <- 350
+n_farms <- length(unique(sim_yield$SimUID))
 
+# Joint bootstrap: sample (SimUID, FTN) pairs from EPIC rows
 set.seed(5678)
-N_farms <- pmax(pmin(rnorm(n_farms, N_mean, N_sd), N_max), N_min)
+boot_rows <- sim_yield[sample(nrow(sim_yield), n_farms, replace = TRUE), ]
+N_farms <- boot_rows$FTN
+fe_yield_farms <- fe_yield[as.character(boot_rows$SimUID)]
+fe_varf_farms <- fe_varf[as.character(boot_rows$SimUID)]
 
-# Sample location fixed effects (with replacement) from EPIC locations
-sampled_idx <- sample(length(fe_yield), n_farms, replace = TRUE)
-fe_yield_farms <- fe_yield[sampled_idx]
-fe_varf_farms <- fe_varf[sampled_idx]
+# convert from N to tonnes of CAN (assuming 27% N content)
+CAN_farms <- N_farms / 0.27 / 1000
 
 # -------------------------------------------------------------------------------
 ## 5.0.1 Vectorized farm parameters (vectors of length n_farms) -----------------
 # -------------------------------------------------------------------------------
 
-CAN_farms <- N_farms / 0.27 / 1000
+# Implicitly predicts for rainfed + conventional BAU tillage
+# (irr = 0, all tillage dummies = 0).
 pred_yield_farms <- fe_yield_farms +
   coeff_1_yield * sqrt(N_farms) +
   coeff_2_yield * N_farms
@@ -1625,7 +1619,7 @@ for (i in 1:n_strikes) {
 }
 
 # ------------------------------------------------------------------------------
-## 5.0.3.1 Multi-farm profit summary statistics --------------------------------
+## 5.0.4 Multi-farm profit summary statistics --------------------------------
 # ------------------------------------------------------------------------------
 
 # Broad framing: for each scenario, pool all (Ns x n_farms) profit values
@@ -1674,6 +1668,97 @@ if (SAVE_OUTPUTS) {
   write_csv(
     narrow_profit_summary,
     "3_Outputs/Table_MultiFarm_ProfitStats_NarrowFraming.csv"
+  )
+}
+
+# ------------------------------------------------------------------------------
+## 5.0.5 Ridge plots of per-farm expected profit distributions -----------------
+# ------------------------------------------------------------------------------
+
+# Build long data frame: sample from full (Ns x n_farms) profit distribution
+make_ridge_df <- function(mats, nms, n_sample = 5000) {
+  map_dfr(nms, function(s) {
+    x <- as.vector(mats[[s]])
+    tibble(scenario = s, profit = sample(x, min(n_sample, length(x))))
+  })
+}
+
+label_scenarios <- function(nms) {
+  lbl <- nms
+  lbl[lbl == "nc"] <- "No contract"
+  lbl[lbl == "f_fc"] <- "Fert. forward"
+  lbl[lbl == "w_fc"] <- "Wheat forward"
+  lbl[lbl == "both_fc"] <- "Both forwards"
+  lbl <- sub("^fc_(\\d+)$", "Fert. call \\1", lbl)
+  lbl <- sub("^wc_(\\d+)$", "Wheat put \\1", lbl)
+  lbl <- sub("^both_(\\d+)$", "Both \\1", lbl)
+  setNames(lbl, nms)
+}
+
+group_scenarios <- function(nms) {
+  dplyr::case_when(
+    nms == "nc" ~ "No contract",
+    nms %in% c("f_fc", "w_fc", "both_fc") ~ "Forward",
+    grepl("^fc_", nms) ~ "Fert. call",
+    grepl("^wc_", nms) ~ "Wheat put",
+    grepl("^both_", nms) ~ "Both options"
+  )
+}
+
+ridge_colors <- setNames(
+  c("grey50", brewer.pal(5, "Set1")[c(2, 1, 3, 4)]),
+  c("No contract", "Forward", "Fert. call", "Wheat put", "Both options")
+)
+
+broad_ridge_df <- make_ridge_df(broad_mats, broad_names) |>
+  mutate(
+    scenario = factor(scenario, levels = rev(broad_names)),
+    group = group_scenarios(as.character(scenario))
+  )
+
+narrow_ridge_df <- make_ridge_df(narrow_mats, narrow_names) |>
+  mutate(
+    scenario = factor(scenario, levels = rev(narrow_names)),
+    group = group_scenarios(as.character(scenario))
+  )
+
+plot_broad_ridge <- ggplot(
+  broad_ridge_df,
+  aes(x = profit, y = scenario, fill = group)
+) +
+  geom_density_ridges(alpha = 0.7, scale = 1.1, rel_min_height = 0.01) +
+  scale_y_discrete(labels = label_scenarios(rev(broad_names))) +
+  scale_fill_manual(values = ridge_colors, name = NULL) +
+  labs(x = "Expected profit (€/ha)", y = NULL, title = "Broad framing") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+plot_narrow_ridge <- ggplot(
+  narrow_ridge_df,
+  aes(x = profit, y = scenario, fill = group)
+) +
+  geom_density_ridges(alpha = 0.7, scale = 1.1, rel_min_height = 0.01) +
+  scale_y_discrete(labels = label_scenarios(rev(narrow_names))) +
+  scale_fill_manual(values = ridge_colors, name = NULL) +
+  labs(x = "Expected payoff (€/ha)", y = NULL, title = "Narrow framing") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+plot_broad_ridge
+plot_narrow_ridge
+
+if (SAVE_OUTPUTS) {
+  ggsave(
+    "3_Outputs/Figure_RidgePlot_BroadFraming.pdf",
+    plot_broad_ridge,
+    width = 8,
+    height = 7
+  )
+  ggsave(
+    "3_Outputs/Figure_RidgePlot_NarrowFraming.pdf",
+    plot_narrow_ridge,
+    width = 8,
+    height = 7
   )
 }
 
