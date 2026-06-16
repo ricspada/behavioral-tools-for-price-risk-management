@@ -17,7 +17,7 @@ library(ggridges)
 library(fixest)
 
 # Toggle to enable/disable writing output files (CSV tables, PDF figures)
-SAVE_OUTPUTS <- FALSE
+SAVE_OUTPUTS <- TRUE
 
 # Set seed for replicability
 set.seed(1234)
@@ -1672,6 +1672,28 @@ if (SAVE_OUTPUTS) {
 }
 
 
+# parameters
+delta_bf <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001)
+#delta_bf <- c(0.1, 0.5, 1, 2, 4)
+delta_nf <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001)
+
+a_values <- c(0.1, 0.334, 0.5)
+lambda <- c(0.5, 1.574, 2)
+gamma <- c(0.4, 0.571, 0.7)
+
+alpha_amb <- c(0.1, 0.5, 0.9)
+
+# Ambiguity half-widths: probability ± around each farm's own p_hat.
+# hw=0.3 → [p-0.3, p+0.3] (high ambiguity), hw=0.2 → medium, hw=0.1 → low
+amb_halfwidths <- c(0.3, 0.2, 0.1)
+
+# Broad framing reference points: per-farm mean profit under no contract (status quo)
+ref_broad_farms <- colMeans(broad_mats[["nc"]])
+
+# Narrow framing reference point: 0 for all farms
+ref_narrow_farms <- rep(0, n_farms)
+
+
 # ------------------------------------------------------------------------------
 ## 5.0.4 Compute EUT  ----------------------------------------------------------
 # ------------------------------------------------------------------------------
@@ -1710,24 +1732,6 @@ compute_eut_vectorized <- function(
   bind_rows(results)
 }
 
-delta_bf <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001)
-#delta_bf <- c(0.1, 0.5, 1, 2, 4)
-delta_nf <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001)
-
-eut_broad_all <- compute_eut_vectorized(
-  broad_mats,
-  broad_names,
-  delta_bf,
-  N_farms,
-  n_farms
-)
-eut_narrow_all <- compute_eut_vectorized(
-  narrow_mats,
-  narrow_names,
-  delta_nf,
-  N_farms,
-  n_farms
-)
 
 # ------------------------------------------------------------------------------
 ## 5.0.5 Compute CPT  ----------------------------------------------------------
@@ -1813,7 +1817,7 @@ compute_cpt_multifarm <- function(
 }
 
 # -------------------------------------------------------------------------------
-## 5.0.6 Alpha-EU for multi-farm -------------------------------------------
+## 5.0.6 Alpha-EU  -------------------------------------------------------------
 # -------------------------------------------------------------------------------
 
 compute_alpha_eu_multifarm <- function(
@@ -1826,7 +1830,6 @@ compute_alpha_eu_multifarm <- function(
   N_farms,
   n_farms
 ) {
-  # amb_halfwidths: quantile half-widths for cross-farm ambiguity sets
   # ref_vecs: numeric vector length n_farms
   results <- list()
   idx <- 0L
@@ -1899,21 +1902,24 @@ compute_alpha_eu_multifarm <- function(
   bind_rows(results)
 }
 
-# -------------------------------------------------------------------------------
-## 5.0.7 Run CPT and Alpha-EU across all farms ----------------------------------
-# -------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+## 5.0.7 Run EUT, CPT, and Alpha-EU across all farms ---------------------------
+# ------------------------------------------------------------------------------
 
-# Behavioral parameters for CPT and alpha-EU
-a_values <- c(0.1, 0.334, 0.5)
-lambda <- c(0.5, 1.574, 2)
-gamma <- c(0.4, 0.571, 0.7)
-alpha_amb <- c(0.1, 0.5, 0.9)
-# Ambiguity half-widths: probability ± around each farm's own p_hat.
-# hw=0.3 → [p-0.3, p+0.3] (high ambiguity), hw=0.2 → medium, hw=0.1 → low
-amb_halfwidths <- c(0.3, 0.2, 0.1)
-
-# Broad framing reference points: per-farm mean profit under no contract (status quo)
-ref_broad_farms <- colMeans(broad_mats[["nc"]])
+eut_broad_all <- compute_eut_vectorized(
+  broad_mats,
+  broad_names,
+  delta_bf,
+  N_farms,
+  n_farms
+)
+eut_narrow_all <- compute_eut_vectorized(
+  narrow_mats,
+  narrow_names,
+  delta_nf,
+  N_farms,
+  n_farms
+)
 
 cpt_broad_all <- compute_cpt_multifarm(
   broad_mats,
@@ -1936,9 +1942,6 @@ alphaeu_broad_all <- compute_alpha_eu_multifarm(
   N_farms,
   n_farms
 )
-
-# Narrow framing reference point: 0 for all farms
-ref_narrow_farms <- rep(0, n_farms)
 
 cpt_narrow_all <- compute_cpt_multifarm(
   narrow_mats,
@@ -2337,13 +2340,11 @@ wilcox_broad <- map_dfr(setdiff(broad_names, "nc"), function(s) {
 wilcox_broad
 
 # -------------------------------------------------------------------------------
-## 5.5.2 Broad framing: paired Wilcoxon — option vs forward baseline -----------
-#
-# Tests whether adding optionality (cap/floor) improves welfare over the plain
-# forward contract for the same underlying price. Paired on farm_id.
-# alternative = "two.sided": direction not predetermined — EUT agents may prefer
-# forwards (greater variance reduction); behavioural agents may prefer options.
+## 5.5.2 Broad framing: paired Wilcoxon: option vs forward baseline -----------
 # -------------------------------------------------------------------------------
+
+# alternative = "two.sided": direction not predetermined EUT agents may prefer
+# forwards (greater variance reduction); behavioural agents may prefer options.
 
 # Forward baselines: one CE vector per farm per model
 fwd_baselines <- list(
@@ -2416,18 +2417,16 @@ wilcox_vs_fwd <- map_dfr(c("fc", "wc", "both"), function(prefix) {
       eut_ce,
       fwd_baselines[[prefix]]$eut,
       paired = TRUE,
-      alternative = "two.sided"
+      alternative = "greater"
     )
     ta <- wilcox.test(
       aeu_ce,
       fwd_baselines[[prefix]]$aeu,
       paired = TRUE,
-      alternative = "two.sided"
+      alternative = "greater"
     )
 
     tibble(
-      contract_type = prefix,
-      strike = i,
       scenario = s,
       p_EUT = te$p.value,
       p_AlphaEU = ta$p.value
@@ -2437,96 +2436,6 @@ wilcox_vs_fwd <- map_dfr(c("fc", "wc", "both"), function(prefix) {
 
 wilcox_vs_fwd
 
-# Heatmap: option vs forward baseline
-plot_wilcox_fwd_heat <- wilcox_vs_fwd |>
-  pivot_longer(
-    cols = c(p_EUT, p_AlphaEU),
-    names_to = "model",
-    names_prefix = "p_",
-    values_to = "p_value"
-  ) |>
-  mutate(
-    sig = factor(sig_label(p_value), levels = sig_levels),
-    p_label = formatC(p_value, format = "f", digits = 3),
-    model = recode(model, "EUT" = "EUT", "AlphaEU" = "Alpha-EU"),
-    contract_type = recode(
-      contract_type,
-      "fc" = "Fertiliser call",
-      "wc" = "Wheat put",
-      "both" = "Combined"
-    )
-  ) |>
-  ggplot(aes(x = model, y = scenario, fill = sig)) +
-  geom_tile(colour = "white", linewidth = 0.5) +
-  geom_text(aes(label = p_label), size = 2.8, colour = "black") +
-  scale_fill_manual(values = sig_colours, drop = FALSE) +
-  facet_wrap(~contract_type, scales = "free_y", ncol = 1) +
-  labs(
-    title = "Wilcoxon signed-rank: option vs forward baseline (broad framing)",
-    x = NULL,
-    y = NULL,
-    fill = "Significance"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.y = element_text(size = 8),
-    panel.grid = element_blank()
-  )
-
-plot_wilcox_fwd_heat
-
-# -------------------------------------------------------------------------------
-## 5.5.3 Friedman test across strike levels (fc / wc / both, both framings) ----
-#
-# Tests whether the 5 strike levels produce different welfare outcomes.
-# -------------------------------------------------------------------------------
-
-run_friedman <- function(values_list) {
-  mat <- do.call(cbind, values_list)
-  test <- friedman.test(mat)
-  list(
-    chi_sq = unname(test$statistic),
-    df = unname(test$parameter),
-    p_value = test$p.value
-  )
-}
-
-friedman_broad <- map_dfr(c("fc", "wc", "both"), function(prefix) {
-  scens <- paste0(prefix, "_", 1:5)
-
-  eut_vals <- lapply(scens, function(s) {
-    eut_broad_all |>
-      filter(Variable == s, Delta == DELTA_EUT_B) |>
-      arrange(farm_id) |>
-      pull(CertaintyEquivalent)
-  })
-  aeu_vals <- lapply(scens, function(s) {
-    alphaeu_broad_all |>
-      filter(
-        Variable == s,
-        Delta == DELTA_AEU_B,
-        Alpha == ALPHA_AEU,
-        P_interval == P_AEU
-      ) |>
-      arrange(farm_id) |>
-      pull(AlphaEU_CE)
-  })
-
-  fe <- run_friedman(eut_vals)
-  fa <- run_friedman(aeu_vals)
-
-  tibble(
-    contract_type = prefix,
-    chi_sq_EUT = fe$chi_sq,
-    df_EUT = fe$df,
-    p_EUT = fe$p_value,
-    chi_sq_AlphaEU = fa$chi_sq,
-    df_AlphaEU = fa$df,
-    p_AlphaEU = fa$p_value
-  )
-})
-
-friedman_broad
 
 # -------------------------------------------------------------------------------
 ## 5.5.5 Save test results -------------------------------------------------------
@@ -2535,23 +2444,4 @@ friedman_broad
 if (SAVE_OUTPUTS) {
   write_csv(wilcox_broad, "3_Outputs/Table_WilcoxBroad.csv")
   write_csv(wilcox_vs_fwd, "3_Outputs/Table_WilcoxVsForward.csv")
-  write_csv(friedman_broad, "3_Outputs/Table_FriedmanStrikes.csv")
-  ggsave(
-    "3_Outputs/Fig_WilcoxHeatmap.pdf",
-    plot = plot_wilcox_heat,
-    width = 6,
-    height = 10
-  )
-  ggsave(
-    "3_Outputs/Fig_WilcoxVsForwardHeatmap.pdf",
-    plot = plot_wilcox_fwd_heat,
-    width = 6,
-    height = 10
-  )
-  ggsave(
-    "3_Outputs/Fig_FriedmanTile.pdf",
-    plot = plot_friedman_tile,
-    width = 5,
-    height = 4
-  )
 }
