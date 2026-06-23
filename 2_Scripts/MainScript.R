@@ -1619,7 +1619,7 @@ for (i in 1:n_strikes) {
 }
 
 # ------------------------------------------------------------------------------
-## 5.0.4 Multi-farm profit summary statistics --------------------------------
+## 5.0.4 Profits summary statistics --------------------------------
 # ------------------------------------------------------------------------------
 
 # Broad framing: for each scenario, pool all (Ns x n_farms) profit values
@@ -1671,11 +1671,120 @@ if (SAVE_OUTPUTS) {
   )
 }
 
+# -------------------------------------------------------------------------------
+## 5.4d Across-farm distribution of per-farm profit statistics -------------------
+# -------------------------------------------------------------------------------
+
+farm_stat_df <- function(mats, names, framing) {
+  bind_rows(lapply(names, function(s) {
+    m <- mats[[s]]
+    bind_rows(
+      data.frame(value = apply(m, 2, min), statistic = "Min", scenario = s),
+      data.frame(value = colMeans(m), statistic = "Mean", scenario = s),
+      data.frame(value = apply(m, 2, max), statistic = "Max", scenario = s)
+    )
+  })) |>
+    mutate(
+      # compute group from character scenario before reassigning to a factor
+      group = factor(group_scenario(scenario), levels = group_order),
+      scenario = factor(scenario, levels = rev(broad_names)),
+      statistic = factor(statistic, levels = c("Min", "Mean", "Max")),
+      framing = framing
+    )
+}
+
+df_stat_broad <- farm_stat_df(broad_mats, broad_names, "Broad framing")
+df_stat_narrow <- farm_stat_df(narrow_mats, narrow_names, "Narrow framing")
+
+mk_stat_plot <- function(df, xlab) {
+  ggplot(df, aes(x = value, y = scenario, fill = group)) +
+    geom_density_ridges(alpha = 0.4, scale = 1.1) +
+    facet_wrap(~statistic, scales = "free_x") +
+    scale_fill_brewer(palette = "Set2", drop = FALSE) +
+    labs(x = xlab, y = NULL, fill = NULL) +
+    theme_minimal()
+}
+
+plot_stat_broad <- mk_stat_plot(df_stat_broad, "Profit (€/ha)") +
+  labs(title = "Broad framing")
+plot_stat_narrow <- mk_stat_plot(df_stat_narrow, "Contract payoff (€/ha)") +
+  labs(title = "Narrow framing")
+
+plot_stat_broad
+plot_stat_narrow
+
+# -------------------------------------------------------------------------------
+## 5.4c Single-farm profit distributions ----------------------------------------
+# -------------------------------------------------------------------------------
+
+farm_idx <- 3
+narrow_names <- setdiff(broad_names, "nc")
+
+# Contract-type grouping for colour coding
+group_order <- c(
+  "No contract",
+  "Forward",
+  "Fert. call",
+  "Wheat put",
+  "Both options"
+)
+group_scenario <- function(s) {
+  case_when(
+    s == "nc" ~ "No contract",
+    s %in% c("f_fc", "w_fc", "both_fc") ~ "Forward",
+    grepl("^fc_", s) ~ "Fert. call",
+    grepl("^wc_", s) ~ "Wheat put",
+    grepl("^both_", s) ~ "Both options"
+  )
+}
+
+# Stack the single farm's column across scenarios into a long data frame
+single_farm_df <- function(mats, names, framing) {
+  bind_rows(lapply(names, function(s) {
+    data.frame(
+      value = mats[[s]][, farm_idx],
+      scenario = s,
+      group = group_scenario(s),
+      framing = framing
+    )
+  })) |>
+    mutate(
+      # reverse levels so the first scenario sits at the top of the ridge
+      scenario = factor(scenario, levels = rev(broad_names)),
+      group = factor(group, levels = group_order)
+    )
+}
+
+df_broad <- single_farm_df(broad_mats, broad_names, "Broad framing")
+df_narrow <- single_farm_df(narrow_mats, narrow_names, "Narrow framing")
+
+plot_broad_sf <- ggplot(df_broad, aes(x = value, y = scenario, fill = group)) +
+  geom_density_ridges(alpha = 0.4, scale = 1.1) +
+  scale_fill_brewer(palette = "Set2", drop = FALSE) +
+  labs(title = "Broad framing", x = "Profit (€/ha)", y = NULL, fill = NULL) +
+  theme_minimal()
+
+plot_narrow_sf <- ggplot(
+  df_narrow,
+  aes(x = value, y = scenario, fill = group)
+) +
+  geom_density_ridges(alpha = 0.4, scale = 1.1) +
+  scale_fill_brewer(palette = "Set2", drop = FALSE) +
+  labs(
+    title = "Narrow framing",
+    x = "Contract payoff (€/ha)",
+    y = NULL,
+    fill = NULL
+  ) +
+  theme_minimal()
+
+plot_broad_sf
+plot_narrow_sf
+
 
 # parameters
-delta_bf <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001)
-#delta_bf <- c(0.1, 0.5, 1, 2, 4)
-delta_nf <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001)
+delta_bf <- c(0.0005, 0.001, 0.002, 0.003, 0.004)
+delta_nf <- delta_bf
 
 a_values <- c(0.1, 0.334, 0.5)
 lambda <- c(0.5, 1.574, 2)
@@ -1973,6 +2082,8 @@ eut_broad_summary <- eut_broad_all |>
   group_by(Delta, Variable) |>
   summarise(
     mean_CE = mean(CertaintyEquivalent),
+    # RP: risk premium in €/ha (mean profit - CE)
+    RP = mean(RiskPremium),
     sd_CE = sd(CertaintyEquivalent),
     q05_CE = quantile(CertaintyEquivalent, 0.05),
     q25_CE = quantile(CertaintyEquivalent, 0.25),
@@ -2015,6 +2126,7 @@ eut_narrow_summary <- eut_narrow_all |>
   group_by(Delta, Variable) |>
   summarise(
     mean_CE = mean(CertaintyEquivalent),
+    RP = mean(RiskPremium),
     sd_CE = sd(CertaintyEquivalent),
     q05_CE = quantile(CertaintyEquivalent, 0.05),
     q25_CE = quantile(CertaintyEquivalent, 0.25),
