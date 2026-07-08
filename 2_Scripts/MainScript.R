@@ -781,7 +781,7 @@ round(psu_r2s_w, 3)
 
 ### create QVAR tables ---------------------------------------------------
 
-# Note: substitute QVAR R2 with pseudo R2 derived above
+# QVAR R2 substituted with pseudo R2 (psu_r2s) derived above
 
 model_list_f <- list("VAR" = var_f)
 for (tau in taus_sparse) {
@@ -962,7 +962,7 @@ Ns <- 1000
 Ys_changes <- array(0, dim = c(2, Nt, Ns))
 Ys_levels <- array(0, dim = c(2, Nt, Ns))
 
-# zero initial change (mean of stationary differences ≈ 0)
+# zero initial change
 Ys_changes[1, 1, ] <- 0
 Ys_changes[2, 1, ] <- 0
 
@@ -978,7 +978,7 @@ for (it in 2:Nt) {
     f_change1 <- Ys_changes[1, it - 1, is]
     w_change1 <- Ys_changes[2, it - 1, is]
 
-    # D_shock = 0 post-shock
+    # D_shock = 0 no-shock. For scenario analysis, can set to 1 to simulate shock
     Xfi <- cbind(1, f_change1, w_change1, 0)
     Xwi <- cbind(1, f_change1, w_change1, 0)
 
@@ -1015,7 +1015,7 @@ simulated_prices <- data.frame(
   simulation = rep(1:Ns, each = Nt)
 )
 
-# Historical prices in level form (same space as simulation output)
+# Historical prices in level form
 dat_level <- dat |>
   mutate(f_p_level = exp(f_p), w_p_level = exp(w_p))
 
@@ -1041,9 +1041,10 @@ sim_fan <- simulated_prices |>
   ) |>
   mutate(Date = sim_dates)
 
-# Shared y-axis limits per commodity
+# Shared axis limits for density plots
 ylim_f <- range(c(dat_level$f_p_level, simulated_prices$price_f_level))
 ylim_w <- range(c(dat_level$w_p_level, simulated_prices$price_w_level))
+ylim_density <- c(0, 0.03)
 
 # Fertilizer plot
 
@@ -1073,7 +1074,7 @@ p_ts_f <- ggplot() +
     linewidth = 0.5
   ) +
   coord_cartesian(ylim = ylim_f) +
-  labs(x = NULL, y = "CAN price (€/t)") +
+  labs(x = NULL, y = "CAN price (EUR/t)\n") +
   theme_minimal() +
   theme(panel.grid.minor = element_blank())
 
@@ -1092,7 +1093,7 @@ p_dens_f <- ggplot() +
     name = NULL,
     values = c("Simulated" = "#E41A1C", "Historical" = "darkblue")
   ) +
-  coord_flip(xlim = ylim_f) +
+  coord_flip(xlim = ylim_f, ylim = ylim_density) +
   labs(x = "Density", y = NULL) +
   theme_minimal() +
   theme(
@@ -1133,7 +1134,7 @@ p_ts_w <- ggplot() +
     linewidth = 0.5
   ) +
   coord_cartesian(ylim = ylim_w) +
-  labs(x = NULL, y = "Wheat price (€/t)") +
+  labs(x = NULL, y = "Wheat price (EUR/t)\n") +
   theme_minimal() +
   theme(panel.grid.minor = element_blank())
 
@@ -1152,7 +1153,7 @@ p_dens_w <- ggplot() +
     name = NULL,
     values = c("Simulated" = "#E41A1C", "Historical" = "darkgreen")
   ) +
-  coord_flip(xlim = ylim_w) +
+  coord_flip(xlim = ylim_w, ylim = ylim_density) +
   labs(x = "Density", y = NULL) +
   theme_minimal() +
   theme(
@@ -1176,6 +1177,37 @@ if (SAVE_OUTPUTS) {
     width = 10,
     height = 4
   )
+}
+
+#-------------------------------------------------------------------------------
+### 3.1.2 Summary statistics: historical vs simulated level prices --------------
+#-------------------------------------------------------------------------------
+
+price_stats <- function(x, series, commodity) {
+  tibble(
+    series = series,
+    commodity = commodity,
+    mean = mean(x),
+    median = median(x),
+    sd = sd(x),
+    min = min(x),
+    max = max(x),
+    skewness = moments::skewness(x)
+  )
+}
+
+price_summary <- bind_rows(
+  price_stats(dat_level$f_p_level, "Historical", "CAN"),
+  price_stats(simulated_prices$price_f_level, "Simulated", "CAN"),
+  price_stats(dat_level$w_p_level, "Historical", "Wheat"),
+  price_stats(simulated_prices$price_w_level, "Simulated", "Wheat")
+) |>
+  mutate(across(where(is.double), ~ round(., 2)))
+
+price_summary
+
+if (SAVE_OUTPUTS) {
+  write_csv(price_summary, "3_Outputs/Table_PriceSummary.csv")
 }
 
 
@@ -1216,7 +1248,8 @@ for (t in 1:simulated_years) {
 #-------------------------------------------------------------------------------
 
 # define strike prices
-max_prices <- quantile(sim_f_p, probs = c(0.5, 0.6, 0.7, 0.8, 0.9))
+fert_probs <- c(0.5, 0.6, 0.7, 0.8, 0.9)
+max_prices <- quantile(sim_f_p, probs = fert_probs)
 
 premium_array <- numeric(length(max_prices))
 
@@ -1235,96 +1268,6 @@ premium_results <- data.frame(
 ) |>
   mutate(across(everything(), ~ round(., 3)))
 
-if (SAVE_OUTPUTS) {
-  write_csv(premium_results, "3_Outputs/Table_ContractPayoff.csv")
-}
-
-#-------------------------------------------------------------------------------
-### 4.1.1 Plot distribution density - fertilizer -------------------------------
-#-------------------------------------------------------------------------------
-
-strike_vec <- premium_results$strike_price
-cb_colors <- brewer.pal(3, "Dark2")[1:2]
-
-# Plot density of original sim_f_p with strike prices
-plot_original <- ggplot(data.frame(sim_f_p), aes(x = sim_f_p)) +
-  geom_density(
-    alpha = 0.3,
-    linewidth = 0.5,
-    color = cb_colors[2],
-    fill = cb_colors[2]
-  ) +
-  geom_vline(
-    xintercept = strike_vec,
-    color = cb_colors[1],
-    linetype = "dashed"
-  ) +
-  labs(
-    x = "Simulated prices and strike levels\n",
-    y = "Density"
-  ) +
-  theme_minimal()
-
-# one plot per strike price (capped distribution)
-plot_list <- lapply(seq_along(strike_vec), function(i) {
-  k <- strike_vec[i]
-  sim_f_p_adj <- pmin(sim_f_p, k)
-
-  df <- data.frame(
-    value = c(sim_f_p, sim_f_p_adj),
-    type = c(
-      rep("Original", length(sim_f_p)),
-      rep(paste0("Capped (k = ", k, ")"), length(sim_f_p_adj))
-    )
-  )
-
-  ggplot(df, aes(x = value, color = type, fill = type)) +
-    geom_density(alpha = 0.3, linewidth = 0.5) +
-    scale_color_manual(
-      values = cb_colors,
-      labels = c("Adjusted contract", "No contract")
-    ) +
-    scale_fill_manual(
-      values = cb_colors,
-      labels = c("Adjusted contract", "No contract")
-    ) +
-    labs(
-      x = paste("Strike =", k, "\n"),
-      y = NULL,
-      color = NULL,
-      fill = NULL
-    ) +
-    theme_minimal() +
-    theme(legend.position = "top")
-})
-
-plot_list[[2]] <- plot_list[[2]] + theme(legend.position = "none")
-plot_list[[3]] <- plot_list[[3]] +
-  labs(y = "Density\n") +
-  theme(legend.position = "none")
-plot_list[[4]] <- plot_list[[4]] +
-  labs(x = paste("Strike =", round(strike_vec[4], 3), "\n\nPrice (eur/t)")) +
-  theme(legend.position = "none")
-plot_list[[5]] <- plot_list[[5]] + theme(legend.position = "none")
-
-# Combine into 2x3 layout
-final_plot <- plot_original +
-  plot_list[[1]] +
-  plot_list[[2]] +
-  plot_list[[3]] +
-  plot_list[[4]] +
-  plot_list[[5]]
-
-final_plot
-
-if (SAVE_OUTPUTS) {
-  ggsave(
-    "3_Outputs/Fig_PriceDensities_SimulatedStrikes.pdf",
-    plot = final_plot,
-    width = 12,
-    height = 8
-  )
-}
 
 #-------------------------------------------------------------------------------
 ## 4.2 Output Contract Pricing based on simulated wheat prices -----------------
@@ -1337,7 +1280,8 @@ discount_factor_w <- 1 / (1 + int)^T_years_w
 
 # Strike prices: lower quantiles provide downside (floor) protection on revenue.
 # Symmetric to the fertilizer call's 0.5-0.9 range: same 40-pct span, lower tail.
-min_prices <- quantile(sim_w_p, probs = c(0.1, 0.2, 0.3, 0.4, 0.5))
+wheat_probs <- c(0.1, 0.2, 0.3, 0.4, 0.5)
+min_prices <- quantile(sim_w_p, probs = wheat_probs)
 
 premium_array_w <- numeric(length(min_prices))
 
@@ -1357,96 +1301,57 @@ premium_results_w <- data.frame(
 
 premium_results_w
 
-if (SAVE_OUTPUTS) {
-  write_csv(premium_results_w, "3_Outputs/Table_ContractPayoff_Wheat.csv")
+#-------------------------------------------------------------------------------
+## 4.3 Combined strike/premium summary table ------------------------------------
+#-------------------------------------------------------------------------------
+
+# Build a long-format table of strike price, premium and normalized premium
+# (premium / strike price x 100) for one commodity, labelled by its deviation
+# from the median price (|prob - 0.5|).
+build_premium_table <- function(strikes, premiums, probs, commodity) {
+  data.frame(
+    commodity = commodity,
+    deviation = abs(probs - 0.5),
+    `Strike price` = strikes,
+    `Premium` = premiums,
+    `Normalized premium` = premiums / strikes * 100,
+    check.names = FALSE
+  )
 }
 
-#-------------------------------------------------------------------------------
-### 4.2.1 Plot distribution density - wheat ------------------------------------
-#-------------------------------------------------------------------------------
+premium_summary_table <- bind_rows(
+  build_premium_table(
+    max_prices,
+    premium_array,
+    fert_probs,
+    "Calcium Ammonium Nitrate (CAN)"
+  ),
+  build_premium_table(min_prices, premium_array_w, wheat_probs, "Winter Wheat")
+) |>
+  pivot_longer(
+    cols = c(`Strike price`, `Premium`, `Normalized premium`),
+    names_to = "metric",
+    values_to = "value"
+  ) |>
+  mutate(
+    value = round(value, 2),
+    commodity = factor(
+      commodity,
+      levels = c("Calcium Ammonium Nitrate (CAN)", "Winter Wheat")
+    ),
+    metric = factor(
+      metric,
+      levels = c("Strike price", "Premium", "Normalized premium")
+    ),
+    deviation = factor(round(deviation, 1), levels = c(0.4, 0.3, 0.2, 0.1, 0))
+  ) |>
+  arrange(commodity, metric) |>
+  pivot_wider(names_from = deviation, values_from = value)
 
-strike_vec_w <- premium_results_w$strike_price
-
-# Plot density of sim_w_p with strike price levels
-plot_original_w <- ggplot(data.frame(sim_w_p), aes(x = sim_w_p)) +
-  geom_density(
-    alpha = 0.3,
-    linewidth = 0.5,
-    color = cb_colors[2],
-    fill = cb_colors[2]
-  ) +
-  geom_vline(
-    xintercept = strike_vec_w,
-    color = cb_colors[1],
-    linetype = "dashed"
-  ) +
-  labs(
-    x = "Simulated wheat prices and strike levels\n",
-    y = "Density"
-  ) +
-  theme_minimal() +
-  coord_cartesian(ylim = c(0, 0.06))
-
-# One plot per strike price (floored distribution)
-plot_list_w <- lapply(seq_along(strike_vec_w), function(i) {
-  k_w <- strike_vec_w[i]
-  sim_w_p_adj <- pmax(sim_w_p, k_w)
-
-  df_w <- data.frame(
-    value = c(sim_w_p, sim_w_p_adj),
-    type = c(
-      rep("Original", length(sim_w_p)),
-      rep(paste0("Floored (k = ", k_w, ")"), length(sim_w_p_adj))
-    )
-  )
-
-  ggplot(df_w, aes(x = value, color = type, fill = type)) +
-    geom_density(alpha = 0.3, linewidth = 0.5) +
-    scale_color_manual(
-      values = cb_colors,
-      labels = c("Min-price contract", "No contract")
-    ) +
-    scale_fill_manual(
-      values = cb_colors,
-      labels = c("Min-price contract", "No contract")
-    ) +
-    labs(
-      x = paste("Strike =", k_w, "\n"),
-      y = NULL,
-      color = NULL,
-      fill = NULL
-    ) +
-    theme_minimal() +
-    theme(legend.position = "top") +
-    coord_cartesian(ylim = c(0, 0.06))
-})
-
-plot_list_w[[2]] <- plot_list_w[[2]] + theme(legend.position = "none")
-plot_list_w[[3]] <- plot_list_w[[3]] +
-  labs(y = "Density\n") +
-  theme(legend.position = "none")
-plot_list_w[[4]] <- plot_list_w[[4]] +
-  labs(x = paste("Strike =", round(strike_vec_w[4], 3), "\n\nPrice (eur/t)")) +
-  theme(legend.position = "none")
-plot_list_w[[5]] <- plot_list_w[[5]] + theme(legend.position = "none")
-
-# Combine into 2x3 layout
-final_plot_w <- plot_original_w +
-  plot_list_w[[1]] +
-  plot_list_w[[2]] +
-  plot_list_w[[3]] +
-  plot_list_w[[4]] +
-  plot_list_w[[5]]
-
-final_plot_w
+premium_summary_table
 
 if (SAVE_OUTPUTS) {
-  ggsave(
-    "3_Outputs/Fig_PriceDensities_SimulatedStrikes_Wheat.pdf",
-    plot = final_plot_w,
-    width = 12,
-    height = 8
-  )
+  write_csv(premium_summary_table, "3_Outputs/Table_PremiumSummary.csv")
 }
 
 # ==============================================================================
@@ -1457,7 +1362,7 @@ if (SAVE_OUTPUTS) {
 ## 5.0.0 Parameters needed by multi-farm simulation ----------------------------
 # ------------------------------------------------------------------------------
 
-# Get nitrogen coefficients from production function.
+# get coeff from fitted models
 fe_yield <- fixef(yield_function)$SimUID
 fe_varf <- fixef(variation_function)$SimUID
 
@@ -1467,7 +1372,7 @@ coeff_2_yield <- coef(yield_function)["FTN"]
 coeff_1_varf <- coef(variation_function)["sqrt(FTN)"]
 coeff_2_varf <- coef(variation_function)["FTN"]
 
-# Forward prices: risk-neutral expectation E[S_T] from the simulation
+# Forward prices: actuarlly fair forward prices (mean of simulated prices)
 sim_f_p_forward <- rep(mean(sim_f_p), Ns)
 sim_w_p_forward <- rep(mean(sim_w_p), Ns)
 
@@ -1477,6 +1382,9 @@ n_farms <- length(unique(sim_yield$SimUID))
 set.seed(5678)
 boot_rows <- sim_yield[sample(nrow(sim_yield), n_farms, replace = TRUE), ]
 N_farms <- boot_rows$FTN
+
+# alternatively, use fixed level of N fertilizer for all farms (180 kg/ha)
+# N_farms <- rep(180, n_farms)
 fe_yield_farms <- fe_yield[as.character(boot_rows$SimUID)]
 fe_varf_farms <- fe_varf[as.character(boot_rows$SimUID)]
 
@@ -1492,6 +1400,7 @@ CAN_farms <- N_farms / 0.27 / 1000
 pred_yield_farms <- fe_yield_farms +
   coeff_1_yield * sqrt(N_farms) +
   coeff_2_yield * N_farms
+
 pred_sigma_farms <- fe_varf_farms +
   coeff_1_varf * sqrt(N_farms) +
   coeff_2_varf * N_farms
@@ -1503,8 +1412,8 @@ pred_sigma_farms <- fe_varf_farms +
 # Each column is one farm's Ns (Number of simulations) yield draws
 sim_yield_mat <- matrix(rnorm(Ns * n_farms), nrow = Ns, ncol = n_farms)
 # each column gets farm-specific mean and sd
-sim_yield_mat <- sweep(sim_yield_mat, 2, pred_sigma_farms, "*")
-sim_yield_mat <- sweep(sim_yield_mat, 2, pred_yield_farms, "+")
+sim_yield_mat <- sweep(sim_yield_mat, MARGIN = 2, pred_sigma_farms, "*")
+sim_yield_mat <- sweep(sim_yield_mat, MARGIN = 2, pred_yield_farms, "+")
 
 # -------------------------------------------------------------------------------
 ## 5.0.3 Vectorized profit matrices (Ns x n_farms each) -------------------------
@@ -1515,18 +1424,20 @@ sim_f_p_vec <- drop(sim_f_p)
 sim_w_p_vec <- drop(sim_w_p)
 sim_f_p_fwd_vec <- drop(sim_f_p_forward)
 
-# Helper: outer products give Ns x n_farms matrices
+# for every 1,000 simulated fertilizer prices, and for every farm,
+# calculate how much that farm would have to pay for its fertilizer
 fert_cost_spot <- outer(sim_f_p_vec, CAN_farms) # sim_f_p * CAN_f
 fert_cost_fwd <- outer(sim_f_p_fwd_vec, CAN_farms) # sim_f_p_forward * CAN_f
 
 # Wheat revenue: sim_w_p_vec (Ns) * sim_yield_mat (Ns x n_farms)
 wheat_rev <- sim_w_p_vec * sim_yield_mat
 
-# --- Broad framing profit matrices ---
+# Broad framing profit matrices
 n_strikes <- nrow(premium_results)
 n_strikes_w <- nrow(premium_results_w)
 # Total scenarios: nc, f_fc, w_fc, both_fc, fc_1..5, wc_1..5, both_1..5 = 19
 sim_w_p_fwd_vec <- rep(sim_w_p_forward[1], Ns)
+
 broad_names <- c(
   "nc",
   "f_fc",
@@ -1574,7 +1485,7 @@ for (i in 1:n_strikes) {
     outer(rep(c_f, Ns), CAN_farms)
 }
 
-# --- Narrow framing profit matrices ---
+# Narrow framing profit matrices
 narrow_names <- c(
   "f_fc",
   "w_fc",
@@ -1672,8 +1583,29 @@ if (SAVE_OUTPUTS) {
 }
 
 # -------------------------------------------------------------------------------
-## 5.4d Across-farm distribution of per-farm profit statistics -------------------
+## 5.4b Distribution of per-farm profit statistics -------------------
 # -------------------------------------------------------------------------------
+
+narrow_names <- setdiff(broad_names, "nc")
+
+# Contract-type grouping for colour coding
+group_order <- c(
+  "No contract",
+  "Forward",
+  "Fert. call",
+  "Wheat put",
+  "Both options"
+)
+group_scenario <- function(s) {
+  case_when(
+    s == "nc" ~ "No contract",
+    s %in% c("f_fc", "w_fc", "both_fc") ~ "Forward",
+    grepl("^fc_", s) ~ "Fert. call",
+    grepl("^wc_", s) ~ "Wheat put",
+    grepl("^both_", s) ~ "Both options"
+  )
+}
+
 
 farm_stat_df <- function(mats, names, framing) {
   bind_rows(lapply(names, function(s) {
@@ -1710,80 +1642,22 @@ plot_stat_broad <- mk_stat_plot(df_stat_broad, "Profit (€/ha)") +
 plot_stat_narrow <- mk_stat_plot(df_stat_narrow, "Contract payoff (€/ha)") +
   labs(title = "Narrow framing")
 
-plot_stat_broad
-plot_stat_narrow
+single_farm_profit_plot <- (plot_stat_broad + theme(legend.position = "left")) +
+  (plot_stat_narrow + theme(legend.position = "none"))
 
-# -------------------------------------------------------------------------------
-## 5.4c Single-farm profit distributions ----------------------------------------
-# -------------------------------------------------------------------------------
+single_farm_profit_plot
 
-farm_idx <- 3
-narrow_names <- setdiff(broad_names, "nc")
-
-# Contract-type grouping for colour coding
-group_order <- c(
-  "No contract",
-  "Forward",
-  "Fert. call",
-  "Wheat put",
-  "Both options"
-)
-group_scenario <- function(s) {
-  case_when(
-    s == "nc" ~ "No contract",
-    s %in% c("f_fc", "w_fc", "both_fc") ~ "Forward",
-    grepl("^fc_", s) ~ "Fert. call",
-    grepl("^wc_", s) ~ "Wheat put",
-    grepl("^both_", s) ~ "Both options"
-  )
-}
-
-# Stack the single farm's column across scenarios into a long data frame
-single_farm_df <- function(mats, names, framing) {
-  bind_rows(lapply(names, function(s) {
-    data.frame(
-      value = mats[[s]][, farm_idx],
-      scenario = s,
-      group = group_scenario(s),
-      framing = framing
-    )
-  })) |>
-    mutate(
-      # reverse levels so the first scenario sits at the top of the ridge
-      scenario = factor(scenario, levels = rev(broad_names)),
-      group = factor(group, levels = group_order)
-    )
-}
-
-df_broad <- single_farm_df(broad_mats, broad_names, "Broad framing")
-df_narrow <- single_farm_df(narrow_mats, narrow_names, "Narrow framing")
-
-plot_broad_sf <- ggplot(df_broad, aes(x = value, y = scenario, fill = group)) +
-  geom_density_ridges(alpha = 0.4, scale = 1.1) +
-  scale_fill_brewer(palette = "Set2", drop = FALSE) +
-  labs(title = "Broad framing", x = "Profit (€/ha)", y = NULL, fill = NULL) +
-  theme_minimal()
-
-plot_narrow_sf <- ggplot(
-  df_narrow,
-  aes(x = value, y = scenario, fill = group)
-) +
-  geom_density_ridges(alpha = 0.4, scale = 1.1) +
-  scale_fill_brewer(palette = "Set2", drop = FALSE) +
-  labs(
-    title = "Narrow framing",
-    x = "Contract payoff (€/ha)",
-    y = NULL,
-    fill = NULL
-  ) +
-  theme_minimal()
-
-plot_broad_sf
-plot_narrow_sf
-
+#===============================================================================
+# 5.1 EUT, CPT and ambiguity analysis ----------------------------------------
+#===============================================================================
 
 # parameters
 delta_bf <- c(0.0005, 0.001, 0.002, 0.003, 0.004)
+# alternative delta values for sensitivity analysis based on direct payments per
+# ha calibration instead of profit per ha
+delta_alt <- c(0.002, 0.004, 0.007, 0.01, 0.02)
+
+# use the same delta values for narrow framing
 delta_nf <- delta_bf
 
 a_values <- c(0.1, 0.334, 0.5)
@@ -1802,6 +1676,11 @@ ref_broad_farms <- colMeans(broad_mats[["nc"]])
 # Narrow framing reference point: 0 for all farms
 ref_narrow_farms <- rep(0, n_farms)
 
+# reference point for alpha-EU
+# uncomment row for sensitivity analysis of reference point choice
+ref_broad_aeu <- colMeans(broad_mats[["nc"]])
+#ref_broad_aeu <- apply(broad_mats[["nc"]], 2, quantile, probs = 0.4)
+#ref_broad_aeu <- apply(broad_mats[["nc"]], 2, quantile, probs = 0.3)
 
 # ------------------------------------------------------------------------------
 ## 5.0.4 Compute EUT  ----------------------------------------------------------
@@ -2015,6 +1894,7 @@ compute_alpha_eu_multifarm <- function(
 ## 5.0.7 Run EUT, CPT, and Alpha-EU across all farms ---------------------------
 # ------------------------------------------------------------------------------
 
+# EUT braod framing
 eut_broad_all <- compute_eut_vectorized(
   broad_mats,
   broad_names,
@@ -2022,6 +1902,17 @@ eut_broad_all <- compute_eut_vectorized(
   N_farms,
   n_farms
 )
+
+# EUT braod framing with alternative delta values for sensitivity analysis
+eut_broad_alt <- compute_eut_vectorized(
+  broad_mats,
+  broad_names,
+  delta_alt,
+  N_farms,
+  n_farms
+)
+
+# EUT narrow framing
 eut_narrow_all <- compute_eut_vectorized(
   narrow_mats,
   narrow_names,
@@ -2029,6 +1920,16 @@ eut_narrow_all <- compute_eut_vectorized(
   N_farms,
   n_farms
 )
+
+# EUT narrow framing with alternative delta values for sensitivity analysis
+eut_narrow_alt <- compute_eut_vectorized(
+  narrow_mats,
+  narrow_names,
+  delta_alt,
+  N_farms,
+  n_farms
+)
+
 
 cpt_broad_all <- compute_cpt_multifarm(
   broad_mats,
@@ -2044,7 +1945,7 @@ cpt_broad_all <- compute_cpt_multifarm(
 alphaeu_broad_all <- compute_alpha_eu_multifarm(
   broad_mats,
   broad_names,
-  ref_broad_farms,
+  ref_broad_aeu,
   delta_bf,
   alpha_amb,
   amb_halfwidths,
@@ -2094,6 +1995,15 @@ eut_broad_summary <- eut_broad_all |>
   ) |>
   mutate(across(where(is.numeric) & !any_of("Delta"), ~ round(., 2)))
 
+# alternative deltas
+eut_broad_summary_alt <- eut_broad_alt |>
+  group_by(Delta, Variable) |>
+  summarise(
+    mean_CE = mean(CertaintyEquivalent),
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric) & !any_of("Delta"), ~ round(., 2)))
+
 cpt_broad_summary <- cpt_broad_all |>
   group_by(Alpha, Lambda, Gamma, Variable) |>
   summarise(
@@ -2133,6 +2043,14 @@ eut_narrow_summary <- eut_narrow_all |>
     median_CE = median(CertaintyEquivalent),
     q75_CE = quantile(CertaintyEquivalent, 0.75),
     q95_CE = quantile(CertaintyEquivalent, 0.95),
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric) & !any_of("Delta"), ~ round(., 2)))
+
+eut_narrow_summary_alt <- eut_narrow_alt |>
+  group_by(Delta, Variable) |>
+  summarise(
+    mean_CE = mean(CertaintyEquivalent),
     .groups = "drop"
   ) |>
   mutate(across(where(is.numeric) & !any_of("Delta"), ~ round(., 2)))
@@ -2194,6 +2112,8 @@ if (SAVE_OUTPUTS) {
 ## 5.4 Distribution plots -------------------------------------------------------
 # -------------------------------------------------------------------------------
 
+# contract names
+
 # EUT certainty equivalents under broad framing
 plot_eut_broad_dist <- eut_broad_all |>
   filter(Delta == delta_bf[3]) |>
@@ -2228,7 +2148,7 @@ plot_eut_narrow_dist <- eut_narrow_all |>
     x = NULL,
     y = NULL
   ) +
-  theme_ridges()
+  theme_minimal()
 
 
 # CPT values under narrow framing — standard assumptions
@@ -2265,12 +2185,12 @@ plot_alphaeu_narrow_dist <- alphaeu_narrow_all |>
     x = NULL,
     y = NULL
   ) +
-  theme_ridges()
+  theme_minimal()
 
-utility_plots <- ((plot_eut_broad_dist + labs(y = "Broad Framing")) +
+utility_plots <- ((plot_eut_broad_dist + labs(y = "Broad Framing\n")) +
   plot_cpt_broad_dist +
   plot_alphaeu_broad_dist) /
-  ((plot_eut_narrow_dist + labs(y = "Narrow Framing")) +
+  ((plot_eut_narrow_dist + labs(y = "Narrow Framing\n")) +
     plot_cpt_narrow_dist +
     plot_alphaeu_narrow_dist)
 
@@ -2289,23 +2209,74 @@ if (SAVE_OUTPUTS) {
 # 5.4b SENSITIVITY ANALYSIS PLOTS ==============================================
 # ==============================================================================
 
-# EUT — broad framing: one facet per delta, scenarios on y-axis
+# parameters for consistency
+xlim_eut_broad <- c(
+  min(min(eut_broad_summary$mean_CE), min(eut_broad_summary_alt$mean_CE)),
+  max(max(eut_broad_summary$mean_CE), max(eut_broad_summary_alt$mean_CE))
+)
+xlim_eut_narrow <- c(-90, 50)
+xlim_cpt_broad <- c(-10, 10)
+xlim_cpt_narrow <- c(-10, 10)
+xlim_alphaeu_broad <- c(800, 1200)
+xlim_alphaeu_narrow <- c(-200, 100)
+
+
+# EUT — broad framing
 plot_eut_broad_sens <- eut_broad_summary |>
   mutate(Delta = factor(Delta)) |>
-  ggplot(aes(x = mean_CE, y = Variable)) +
+  ggplot(aes(x = mean_CE, y = Variable, color = Delta)) +
   geom_point() +
-  facet_wrap(~Delta, labeller = label_both, scales = "free_x") +
-  labs(title = "EUT - Broad Framing", x = "Mean CE (€)", y = NULL) +
+  coord_cartesian(xlim = xlim_eut_broad) +
+  labs(title = "EUT - Broad Framing", x = NULL, y = NULL) +
+  scale_colour_brewer(palette = "Blues", direction = 1) +
+  theme_minimal()
+
+# alternative deltas
+plot_eut_broad_sens_alt <- eut_broad_summary_alt |>
+  mutate(Delta = factor(Delta)) |>
+  ggplot(aes(x = mean_CE, y = Variable, color = Delta)) +
+  geom_point() +
+  coord_cartesian(xlim = xlim_eut_broad) +
+  labs(x = "Mean CE (€)", y = NULL) +
+  scale_colour_brewer(palette = "Greens", direction = 1) +
   theme_minimal()
 
 # EUT — narrow framing
 plot_eut_narrow_sens <- eut_narrow_summary |>
   mutate(Delta = factor(Delta)) |>
-  ggplot(aes(x = mean_CE, y = Variable)) +
+  ggplot(aes(x = mean_CE, y = Variable, color = Delta)) +
   geom_point() +
-  facet_wrap(~Delta, labeller = label_both, scales = "free_x") +
-  labs(title = "EUT - Narrow Framing", x = "Mean CE (€)", y = NULL) +
+  coord_cartesian(xlim = xlim_eut_narrow) +
+  labs(title = "EUT - Narrow Framing", x = NULL, y = NULL) +
+  scale_colour_brewer(palette = "Blues", direction = 1) +
   theme_minimal()
+
+# alternative deltas
+plot_eut_narrow_sens_alt <- eut_narrow_summary_alt |>
+  mutate(Delta = factor(Delta)) |>
+  ggplot(aes(x = mean_CE, y = Variable, color = Delta)) +
+  geom_point() +
+  coord_cartesian(xlim = xlim_eut_narrow) +
+  labs(x = "Mean CE (€)", y = NULL) +
+  scale_colour_brewer(palette = "Greens", direction = 1) +
+  theme_minimal()
+
+eut_sens_plots <- ((plot_eut_broad_sens + theme(legend.position = "left")) +
+  (plot_eut_narrow_sens + theme(legend.position = "none"))) /
+  ((plot_eut_broad_sens_alt + theme(legend.position = "left")) +
+    (plot_eut_narrow_sens_alt + theme(legend.position = "none")))
+
+eut_sens_plots
+
+# save outputs
+if (SAVE_OUTPUTS) {
+  ggsave(
+    "3_Outputs/Fig_EUT_Sensitivity.pdf",
+    plot = eut_sens_plots,
+    width = 14,
+    height = 10
+  )
+}
 
 # CPT — broad framing: facet_grid(Lambda ~ Gamma), colour by Alpha
 plot_cpt_broad_sens <- cpt_broad_summary |>
@@ -2356,6 +2327,7 @@ plot_alphaeu_broad_sens <- alphaeu_broad_summary |>
     y = NULL,
     colour = "δ"
   ) +
+  coord_cartesian(xlim = xlim_alphaeu_broad) +
   theme_minimal()
 
 # Alpha-EU — narrow framing
@@ -2371,28 +2343,9 @@ plot_alphaeu_narrow_sens <- alphaeu_narrow_summary |>
     y = NULL,
     colour = "δ"
   ) +
+  coord_cartesian(xlim = xlim_alphaeu_narrow) +
   theme_minimal()
 
-plot_eut_broad_sens
-plot_eut_narrow_sens
-plot_cpt_broad_sens
-plot_cpt_narrow_sens
-plot_alphaeu_broad_sens
-plot_alphaeu_narrow_sens
-
-sens_plots <- (plot_eut_broad_sens +
-  plot_cpt_broad_sens +
-  plot_alphaeu_broad_sens) /
-  (plot_eut_narrow_sens + plot_cpt_narrow_sens + plot_alphaeu_narrow_sens)
-
-if (SAVE_OUTPUTS) {
-  ggsave(
-    "3_Outputs/Fig_Sensitivity_Plots.pdf",
-    plot = sens_plots,
-    width = 14,
-    height = 10
-  )
-}
 
 # ==============================================================================
 # 5.5 FORMAL STATISTICAL TESTS =================================================
