@@ -2,7 +2,7 @@
 
 Data and R code for:
 
-> Spada, R., Åkerman, L., Cerroni, S., Meuwissen, M. P. M., Moritz, L., Rommel, J., Skalský, R., & Dalhaus, T. (2026). Behavioural contracts for farmers' nitrogen and wheat price risk management: Evaluation under different decision theories and framings. Submitted to *European Review of Agricultural Economics*.
+Behavioural contracts for farmers' nitrogen and wheat price risk management: Evaluation under different decision theories and framings. Submitted to *European Review of Agricultural Economics*.
 
 **Authors**
 
@@ -23,10 +23,11 @@ Riccardo Spada<sup>1</sup> (corresponding author), Lucas Åkerman<sup>2</sup>, S
 - **1_Data/**
   - **RawData/**
     - **PriceData/**                        Raw price data files from the North-Rhine-Westphalia Chamber of Agriculture.
+    - **SimUcpl_DE** 
+    EPIC-IIASA Simulation Unit available for Germany.
     - `DE_VG5000.gpkg`                      German administrative boundaries (BKG VG5000).
     - `PPI_Cereals_Germany.xlsx`            Producer Price Index for cereals in Germany.
     - `PPI_Fertilizers_Germany.xlsx`        Producer Price Index for fertilizers in Germany.
-    - `SimUcpl_DE`                          EPIC-IIASA Simulation Unit available for Germany.
   - `FertilizerPrices.csv`                 Processed fertilizer price data.
   - `Germany_EPIC.csv.gz`                  EPIC-IIASA crop simulations for the 724 sampled Simulation Units (read compressed).
   - `WheatPrices.csv`                      Processed wheat price data.
