@@ -4,12 +4,15 @@
 .RData
 .Ruserdata
 
-# uncompressed EPIC dataset
-1_Data/Germany_EPIC.csv
+# crop type raster (exceeds GitHub file size limit)
+1_Data/CROPTYPES_DE_P1Y_2024_V02.tif
+
+# temporary files
+3_Outputs/*.rds
+
+# Docs folder
+4_Documents/
 
 # Claude
 .claude
 CLAUDE.md
-
-# Todo file
-TODO.md

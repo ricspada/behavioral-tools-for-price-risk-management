@@ -1,3 +1,6 @@
+# clean environment
+rm(list = ls())
+
 # Load required libraries
 library(quantreg)
 library(readxl)
@@ -11,7 +14,6 @@ library(patchwork)
 library(urca)
 library(moments)
 library(RColorBrewer)
-#library(stargazer)
 library(strucchange)
 library(ggridges)
 library(fixest)
@@ -150,7 +152,7 @@ yield_function <- feols(
     til_contill_r90 |
     SimUID,
   data = sim_yield,
-  vcov = "hetero"
+  vcov = ~SimUID
 )
 
 summary(yield_function)
@@ -171,7 +173,7 @@ variation_function <- feols(
     til_contill_r90 |
     SimUID,
   data = sim_yield,
-  vcov = "hetero"
+  vcov = ~SimUID
 )
 
 summary(variation_function)
@@ -202,7 +204,7 @@ if (SAVE_OUTPUTS) {
 f_data <- read_csv("1_Data/FertilizerPrices.csv")
 f_data <- f_data[f_data[[2]] == "CAN", ]
 
-# keep data only for Bread wheat (alt. 'Feed_Wheat')
+# keep data only for Feed wheat (alt. 'Feed_Wheat')
 w_data <- read_csv("1_Data/WheatPrices.csv")
 w_data <- w_data[w_data[[2]] == "Bread_Wheat", ]
 
@@ -281,17 +283,17 @@ dat$w_p[outliers_w$index] <- outliers_w$replacements
 # plot clean time series
 clean_price_plot <- ggplot(dat, aes(x = Date)) +
   geom_line(
-    aes(y = f_p, color = "Calcium Ammonium Nitrate price"),
+    aes(y = f_p, color = "Calcium Ammonium Nitrate (CAN)"),
     linewidth = 0.5
   ) +
-  geom_line(aes(y = w_p, color = "Wheat price"), linewidth = 0.5) +
+  geom_line(aes(y = w_p, color = "Wheat"), linewidth = 0.5) +
   scale_color_manual(
     values = c(
-      "Calcium Ammonium Nitrate price" = colors[1],
-      "Wheat price" = colors[2]
+      "Calcium Ammonium Nitrate (CAN)" = colors[1],
+      "Wheat" = colors[2]
     )
   ) +
-  labs(y = "Log of price (€/kg)", x = NULL, color = NULL) +
+  labs(y = "Log price", x = NULL, color = NULL) +
   theme_minimal() +
   theme(
     legend.position = c(0.1, 0.9),
@@ -393,9 +395,15 @@ plot_dif_w <- ggplot(dif_dat, aes(x = Date)) +
 
 combined_dif_plots <- (plot_dif_f +
   theme(axis.text.x = element_blank()) +
-  coord_cartesian(xlim = as.Date(c("2009-07-01", "2025-08-01")))) /
+  coord_cartesian(
+    xlim = as.Date(c("2009-07-01", "2025-08-01")),
+    ylim = c(-0.2, 0.65)
+  )) /
   (plot_dif_w +
-    coord_cartesian(xlim = as.Date(c("2009-07-01", "2025-08-01"))))
+    coord_cartesian(
+      xlim = as.Date(c("2009-07-01", "2025-08-01")),
+      ylim = c(-0.2, 0.65)
+    ))
 combined_dif_plots
 
 combined_plots <- (clean_price_plot +
@@ -482,7 +490,7 @@ summary_price_table <- summary_price_table %>%
 summary_price_table
 
 if (SAVE_OUTPUTS) {
-  write_csv(summary_price_table, "3_Outputs/Table_PriceSummary.csv")
+  write_csv(summary_price_table, "3_Outputs/Table_Stationarity.csv")
 }
 
 #-------------------------------------------------------------------------------
@@ -744,6 +752,8 @@ taus_sparse <- c(.1, .3, .5, .7, .9)
 
 qvar_f <- rq(mf, tau = taus_sparse, data = var_dat)
 qvar_w <- rq(mw, tau = taus_sparse, data = var_dat)
+
+set.seed(1234)
 sum_qvar_f <- summary(qvar_f, se = "boot", brmethod = "xy")
 sum_qvar_w <- summary(qvar_w, se = "boot", brmethod = "xy")
 sum_qvar_f
@@ -864,8 +874,36 @@ summary(lm(C))
 
 # copula table (sparse quantiles with bootstrap SEs)
 rC <- rq(C, tau = taus_sparse)
+
+set.seed(1234)
 sum_rC <- summary(rC, se = "boot", brmethod = "xy")
 sum_rC
+
+model_list_c <- list()
+for (tau in taus_sparse) {
+  model_list_c[[paste0("", tau)]] <- rq(C, tau = tau)
+}
+
+if (SAVE_OUTPUTS) {
+  modelsummary(
+    model_list_c,
+    title = "Copula: F_w | F_f",
+    output = "3_Outputs/Table_Copula.csv",
+    stars = c("*" = 0.1, "**" = 0.05, "***" = 0.01)
+  )
+}
+
+# alternative specification: the quadratic term lets dependence in the tails
+# differ from dependence at the centre
+C_quad <- F_w ~ F_f + I((F_f - 0.5)^2)
+
+set.seed(1234)
+sum_rC_quad <- summary(
+  rq(C_quad, tau = taus_sparse),
+  se = "boot",
+  brmethod = "xy"
+)
+sum_rC_quad
 
 # full copula (dense quantiles for simulation)
 rC_full <- rq(C, tau = taus_dense)
@@ -900,6 +938,7 @@ qMRev <- array(0, dim = c(3, ntau, ntau))
 
 
 # bootstrap quantile regressions
+set.seed(1234)
 for (i in 1:ntau) {
   # Fertilizer
   rqbs[1, i, , ] <- boot.rq(
@@ -928,8 +967,9 @@ for (f in 1:ntau) {
       )
 
       ev <- eigen(PM)$values
-      Rev[r, f, w] <- ev[1]
-      MRev[r, f, w] <- Mod(ev[1])
+      dom <- ev[which.max(Mod(ev))] # eigen() is not ordered by modulus
+      Rev[r, f, w] <- dom
+      MRev[r, f, w] <- Mod(dom)
     }
 
     res[f, w] <- mean(Rev[, f, w])
@@ -937,8 +977,25 @@ for (f in 1:ntau) {
   }
 }
 
-# Test stability at tau = 0.5,0.5
-t.test(MRev[, 3, 3], mu = 1)
+# Stability table: bootstrap median modulus of the dominant root, per quantile pair,
+# with the bootstrap p-value for H0: |dominant root| < 1 in parentheses
+med_mod <- apply(MRev, c(2, 3), median)
+p_lt1 <- apply(MRev, c(2, 3), function(x) mean(x < 1))
+
+stability_table <- matrix(
+  sprintf("%.3f (%.3f)", med_mod, p_lt1),
+  nrow = ntau,
+  ncol = ntau,
+  dimnames = list(
+    paste0("tau_f_", taus_sparse),
+    paste0("tau_w_", taus_sparse)
+  )
+)
+stability_table
+
+if (SAVE_OUTPUTS) {
+  write.csv(stability_table, "3_Outputs/Table_QVARStability.csv")
+}
 
 
 # ==============================================================================
@@ -953,6 +1010,46 @@ n_lev <- nrow(dat)
 Nt <- 24
 # number of draws
 Ns <- 1000
+
+
+# Scenario analysis
+SHOCK_SCENARIO <- FALSE
+
+# Append "_shock" before the extension of a shock-run output path.
+op <- function(path) {
+  if (isTRUE(SHOCK_SCENARIO)) {
+    sub("(\\.[A-Za-z0-9]+)$", "_shock\\1", path)
+  } else {
+    path
+  }
+}
+
+hold_baseline <- function(tag, value_now) {
+  cache <- file.path("3_Outputs", paste0("baseline_", tag, ".rds"))
+  if (isTRUE(SHOCK_SCENARIO)) {
+    if (file.exists(cache)) {
+      return(readRDS(cache))
+    }
+    warning(
+      "SHOCK_SCENARIO is on but ",
+      cache,
+      " is missing - run once with ",
+      "SHOCK_SCENARIO <- FALSE (SAVE_OUTPUTS <- TRUE) first. ",
+      "Falling back to shocked values for '",
+      tag,
+      "'."
+    )
+    return(value_now)
+  }
+  if (isTRUE(SAVE_OUTPUTS)) {
+    saveRDS(value_now, cache)
+  }
+  value_now
+}
+
+# Scenario analysis
+shock_window <- if (SHOCK_SCENARIO) 2:5 else integer(0)
+
 
 #-------------------------------------------------------------------------------
 ## 3.1 Simulation --------------------------------------------------------------
@@ -978,9 +1075,9 @@ for (it in 2:Nt) {
     f_change1 <- Ys_changes[1, it - 1, is]
     w_change1 <- Ys_changes[2, it - 1, is]
 
-    # D_shock = 0 no-shock. For scenario analysis, can set to 1 to simulate shock
-    Xfi <- cbind(1, f_change1, w_change1, 0)
-    Xwi <- cbind(1, f_change1, w_change1, 0)
+    d_shock_it <- as.integer(it %in% shock_window)
+    Xfi <- cbind(1, f_change1, w_change1, d_shock_it)
+    Xwi <- cbind(1, f_change1, w_change1, d_shock_it)
 
     # Draw fertilizer marginal quantile, then wheat conditional on it via copula
     qi_f <- sample(1:99, 1)
@@ -1094,7 +1191,7 @@ p_dens_f <- ggplot() +
     values = c("Simulated" = "#E41A1C", "Historical" = "darkblue")
   ) +
   coord_flip(xlim = ylim_f, ylim = ylim_density) +
-  labs(x = "Density", y = NULL) +
+  labs(x = NULL, y = NULL) +
   theme_minimal() +
   theme(
     panel.grid.minor = element_blank(),
@@ -1154,7 +1251,7 @@ p_dens_w <- ggplot() +
     values = c("Simulated" = "#E41A1C", "Historical" = "darkgreen")
   ) +
   coord_flip(xlim = ylim_w, ylim = ylim_density) +
-  labs(x = "Density", y = NULL) +
+  labs(x = NULL, y = NULL) +
   theme_minimal() +
   theme(
     panel.grid.minor = element_blank(),
@@ -1172,11 +1269,13 @@ plot_sim_prices
 
 if (SAVE_OUTPUTS) {
   ggsave(
-    "3_Outputs/Fig_SimulationFan.pdf",
+    op("3_Outputs/Fig_SimulationFan.pdf"),
     plot_sim_prices,
     width = 10,
     height = 4
   )
+  # per-period price quantile summary, for the baseline-vs-shock fan overlay
+  write_csv(sim_fan, op("3_Outputs/Table_SimulationFan.csv"))
 }
 
 #-------------------------------------------------------------------------------
@@ -1207,7 +1306,7 @@ price_summary <- bind_rows(
 price_summary
 
 if (SAVE_OUTPUTS) {
-  write_csv(price_summary, "3_Outputs/Table_PriceSummary.csv")
+  write_csv(price_summary, op("3_Outputs/Table_PriceSummary.csv"))
 }
 
 
@@ -1219,8 +1318,8 @@ if (SAVE_OUTPUTS) {
 obs_per_year <- 24
 simulated_years <- Nt / obs_per_year
 # exercise in early march
-exercise_time <- 5 + (0:(simulated_years - 1)) * obs_per_year
-int <- 0.03 # Interest rate
+exercise_time <- 11 + (0:(simulated_years - 1)) * obs_per_year
+int <- 0.02 # Interest rate (Euro Short-Term Rate at time of analysis)
 T_years <- 0.5 # time to maturity (6 months)
 discount_factor <- 1 / (1 + int)^T_years
 
@@ -1235,7 +1334,7 @@ for (t in 1:simulated_years) {
 sim_f_p_df <- data.frame(sim_f_p)
 
 # get simulated wheat prices (t=13, early July)
-output_selling_time <- 13 + (0:(simulated_years - 1)) * obs_per_year
+output_selling_time <- 19 + (0:(simulated_years - 1)) * obs_per_year
 
 sim_w_p <- array(dim = c(Ns, simulated_years))
 
@@ -1247,9 +1346,12 @@ for (t in 1:simulated_years) {
 ## 4.1 Input contract pricing based on simulated prices ------------------------
 #-------------------------------------------------------------------------------
 
-# define strike prices
+# define strike prices (held at baseline values on a shock run)
 fert_probs <- c(0.5, 0.6, 0.7, 0.8, 0.9)
-max_prices <- quantile(sim_f_p, probs = fert_probs)
+max_prices <- hold_baseline(
+  "strike_fert",
+  quantile(sim_f_p, probs = fert_probs)
+)
 
 premium_array <- numeric(length(max_prices))
 
@@ -1261,6 +1363,9 @@ for (i in seq_along(max_prices)) {
 
   premium_array[i] <- mean(discounted_payoff)
 }
+
+# premium is the price paid at contract inception -> baseline on a shock run
+premium_array <- hold_baseline("premium_fert", premium_array)
 
 premium_results <- data.frame(
   strike_price = max_prices,
@@ -1281,7 +1386,10 @@ discount_factor_w <- 1 / (1 + int)^T_years_w
 # Strike prices: lower quantiles provide downside (floor) protection on revenue.
 # Symmetric to the fertilizer call's 0.5-0.9 range: same 40-pct span, lower tail.
 wheat_probs <- c(0.1, 0.2, 0.3, 0.4, 0.5)
-min_prices <- quantile(sim_w_p, probs = wheat_probs)
+min_prices <- hold_baseline(
+  "strike_wheat",
+  quantile(sim_w_p, probs = wheat_probs)
+)
 
 premium_array_w <- numeric(length(min_prices))
 
@@ -1292,6 +1400,9 @@ for (i in seq_along(min_prices)) {
   payoff_w <- pmax(strike_w - sim_w_p, 0)
   premium_array_w[i] <- mean(payoff_w * discount_factor_w)
 }
+
+# premium is the price paid at contract inception -> baseline on a shock run
+premium_array_w <- hold_baseline("premium_wheat", premium_array_w)
 
 premium_results_w <- data.frame(
   strike_price = min_prices,
@@ -1351,7 +1462,7 @@ premium_summary_table <- bind_rows(
 premium_summary_table
 
 if (SAVE_OUTPUTS) {
-  write_csv(premium_summary_table, "3_Outputs/Table_PremiumSummary.csv")
+  write_csv(premium_summary_table, op("3_Outputs/Table_PremiumSummary.csv"))
 }
 
 # ==============================================================================
@@ -1372,21 +1483,20 @@ coeff_2_yield <- coef(yield_function)["FTN"]
 coeff_1_varf <- coef(variation_function)["sqrt(FTN)"]
 coeff_2_varf <- coef(variation_function)["FTN"]
 
-# Forward prices: actuarlly fair forward prices (mean of simulated prices)
-sim_f_p_forward <- rep(mean(sim_f_p), Ns)
-sim_w_p_forward <- rep(mean(sim_w_p), Ns)
+# Forward prices: actuarially fair forward prices (mean of simulated prices),
+# locked at their baseline values on a shock run
+sim_f_p_forward <- rep(hold_baseline("fwd_fert", mean(sim_f_p)), Ns)
+sim_w_p_forward <- rep(hold_baseline("fwd_wheat", mean(sim_w_p)), Ns)
 
-n_farms <- length(unique(sim_yield$SimUID))
+# One farm per EPIC location; fixed nitrogen rate of 200 kg N/ha for all farms.
+# Farm heterogeneity comes from the per-SimUID fixed effects only.
+farm_ids <- unique(sim_yield$SimUID)
+n_farms <- length(farm_ids)
 
-# Joint bootstrap: sample (SimUID, FTN) pairs from EPIC rows
-set.seed(5678)
-boot_rows <- sim_yield[sample(nrow(sim_yield), n_farms, replace = TRUE), ]
-N_farms <- boot_rows$FTN
+N_farms <- rep(200, n_farms)
 
-# alternatively, use fixed level of N fertilizer for all farms (180 kg/ha)
-# N_farms <- rep(180, n_farms)
-fe_yield_farms <- fe_yield[as.character(boot_rows$SimUID)]
-fe_varf_farms <- fe_varf[as.character(boot_rows$SimUID)]
+fe_yield_farms <- fe_yield[as.character(farm_ids)]
+fe_varf_farms <- fe_varf[as.character(farm_ids)]
 
 # convert from N to tonnes of CAN (assuming 27% N content)
 CAN_farms <- N_farms / 0.27 / 1000
@@ -1410,6 +1520,7 @@ pred_sigma_farms <- fe_varf_farms +
 # -------------------------------------------------------------------------------
 
 # Each column is one farm's Ns (Number of simulations) yield draws
+set.seed(5678)
 sim_yield_mat <- matrix(rnorm(Ns * n_farms), nrow = Ns, ncol = n_farms)
 # each column gets farm-specific mean and sd
 sim_yield_mat <- sweep(sim_yield_mat, MARGIN = 2, pred_sigma_farms, "*")
@@ -1495,14 +1606,51 @@ narrow_names <- c(
   paste0("both_", 1:n_strikes)
 )
 
+# Display names for plots. Numbers in parentheses are the percentile of the
+# simulated price distribution used as strike (fertilizer ceiling: 50th-90th,
+# wheat floor: 10th-50th). "both_i" pairs the i-th fertilizer strike with the
+# i-th wheat strike
+scenario_labels <- c(
+  nc = "No contract",
+  f_fc = "Forward CAN",
+  w_fc = "Forward wheat",
+  both_fc = "Forward both",
+  fc_1 = "CAN (50)",
+  fc_2 = "CAN (60)",
+  fc_3 = "CAN (70)",
+  fc_4 = "CAN (80)",
+  fc_5 = "CAN (90)",
+  wc_5 = "Wheat (50)",
+  wc_4 = "Wheat (40)",
+  wc_3 = "Wheat (30)",
+  wc_2 = "Wheat (20)",
+  wc_1 = "Wheat (10)",
+  both_5 = "Wheat (50); CAN (90)",
+  both_4 = "Wheat (40); CAN (80)",
+  both_3 = "Wheat (30); CAN (70)",
+  both_2 = "Wheat (20); CAN (60)",
+  both_1 = "Wheat (10); CAN (50)"
+)
+
+# Recode a scenario-code column to display names as an ordered factor.
+relabel_scenarios <- function(df, col = "Variable") {
+  codes <- as.character(df[[col]])
+  stopifnot(all(codes %in% names(scenario_labels)))
+  df[[col]] <- factor(
+    scenario_labels[codes],
+    levels = rev(unname(scenario_labels))
+  )
+  df
+}
+
 # Forward contract payoffs
-fwd_minus_spot <- sim_f_p_fwd_vec - sim_f_p_vec
+spot_minus_fwd <- sim_f_p_vec - sim_f_p_fwd_vec
 wfwd_minus_spot <- sim_w_p_fwd_vec - sim_w_p_vec
 
 narrow_mats <- list()
-narrow_mats[["f_fc"]] <- outer(fwd_minus_spot, CAN_farms)
+narrow_mats[["f_fc"]] <- outer(spot_minus_fwd, CAN_farms)
 narrow_mats[["w_fc"]] <- outer(wfwd_minus_spot, pred_yield_farms)
-narrow_mats[["both_fc"]] <- outer(fwd_minus_spot, CAN_farms) +
+narrow_mats[["both_fc"]] <- outer(spot_minus_fwd, CAN_farms) +
   outer(wfwd_minus_spot, pred_yield_farms)
 
 for (i in 1:n_strikes) {
@@ -1573,12 +1721,18 @@ narrow_profit_summary <- map_dfr(narrow_names, function(s) {
 
 if (SAVE_OUTPUTS) {
   write_csv(
-    broad_profit_summary,
-    "3_Outputs/Table_MultiFarm_ProfitStats_BroadFraming.csv"
+    transform(
+      broad_profit_summary,
+      scenario = unname(scenario_labels[as.character(scenario)])
+    ),
+    op("3_Outputs/Table_MultiFarm_ProfitStats_BroadFraming.csv")
   )
   write_csv(
-    narrow_profit_summary,
-    "3_Outputs/Table_MultiFarm_ProfitStats_NarrowFraming.csv"
+    transform(
+      narrow_profit_summary,
+      scenario = unname(scenario_labels[as.character(scenario)])
+    ),
+    op("3_Outputs/Table_MultiFarm_ProfitStats_NarrowFraming.csv")
   )
 }
 
@@ -1619,33 +1773,79 @@ farm_stat_df <- function(mats, names, framing) {
     mutate(
       # compute group from character scenario before reassigning to a factor
       group = factor(group_scenario(scenario), levels = group_order),
-      scenario = factor(scenario, levels = rev(broad_names)),
       statistic = factor(statistic, levels = c("Min", "Mean", "Max")),
       framing = framing
-    )
+    ) |>
+    relabel_scenarios(col = "scenario")
 }
 
 df_stat_broad <- farm_stat_df(broad_mats, broad_names, "Broad framing")
 df_stat_narrow <- farm_stat_df(narrow_mats, narrow_names, "Narrow framing")
 
-mk_stat_plot <- function(df, xlab) {
-  ggplot(df, aes(x = value, y = scenario, fill = group)) +
-    geom_density_ridges(alpha = 0.4, scale = 1.1) +
-    facet_wrap(~statistic, scales = "free_x") +
-    scale_fill_brewer(palette = "Set2", drop = FALSE) +
-    labs(x = xlab, y = NULL, fill = NULL) +
-    theme_minimal()
+df_stat <- bind_rows(df_stat_broad, df_stat_narrow)
+
+group_colors <- c(
+  "No contract" = "white",
+  "Forward" = "#a7a7a7",
+  "Fert. call" = "darkblue",
+  "Wheat put" = "darkgreen",
+  "Both options" = "#2aaaa2"
+)
+
+framing_titles <- tibble(
+  framing = c("Broad framing", "Narrow framing"),
+  statistic = factor("Min", levels = levels(df_stat$statistic))
+)
+
+farm_profit_plot <- ggplot(
+  df_stat,
+  aes(x = value, y = scenario, fill = group)
+) +
+  geom_density_ridges(alpha = 0.3, scale = 1.1) +
+  facet_wrap(
+    ~ framing + statistic,
+    nrow = 1,
+    scales = "free_x",
+    labeller = function(labels) list(as.character(labels$statistic))
+  ) +
+  geom_text(
+    data = framing_titles,
+    aes(x = -Inf, y = Inf, label = framing),
+    hjust = 0,
+    vjust = -3,
+    size = 4.6,
+    inherit.aes = FALSE
+  ) +
+  coord_cartesian(clip = "off") +
+  scale_fill_manual(values = group_colors, drop = FALSE) +
+  scale_y_discrete(drop = FALSE) +
+  scale_x_continuous(
+    breaks = function(limits) {
+      if (max(limits) > 2500) {
+        scales::breaks_extended(n = 4)(limits)
+      } else {
+        scales::breaks_extended()(limits)
+      }
+    }
+  ) +
+  labs(x = "\n€/ha", y = NULL, fill = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(size = 7),
+    plot.margin = margin(t = 38, r = 6, b = 6, l = 6)
+  )
+
+farm_profit_plot
+
+if (SAVE_OUTPUTS) {
+  ggsave(
+    op("3_Outputs/Fig_Profit_Distribution.pdf"),
+    farm_profit_plot,
+    width = 10,
+    height = 8
+  )
 }
-
-plot_stat_broad <- mk_stat_plot(df_stat_broad, "Profit (€/ha)") +
-  labs(title = "Broad framing")
-plot_stat_narrow <- mk_stat_plot(df_stat_narrow, "Contract payoff (€/ha)") +
-  labs(title = "Narrow framing")
-
-single_farm_profit_plot <- (plot_stat_broad + theme(legend.position = "left")) +
-  (plot_stat_narrow + theme(legend.position = "none"))
-
-single_farm_profit_plot
 
 #===============================================================================
 # 5.1 EUT, CPT and ambiguity analysis ----------------------------------------
@@ -1653,22 +1853,18 @@ single_farm_profit_plot
 
 # parameters
 delta_bf <- c(0.0005, 0.001, 0.002, 0.003, 0.004)
-# alternative delta values for sensitivity analysis based on direct payments per
-# ha calibration instead of profit per ha
-delta_alt <- c(0.002, 0.004, 0.007, 0.01, 0.02)
 
 # use the same delta values for narrow framing
 delta_nf <- delta_bf
 
-a_values <- c(0.1, 0.334, 0.5)
-lambda <- c(0.5, 1.574, 2)
-gamma <- c(0.4, 0.571, 0.7)
+a_values <- c(0.318, 0.334, 0.350)
+lambda <- c(1.386, 1.574, 1.763)
+gamma <- c(0.516, 0.571, 0.625)
 
 alpha_amb <- c(0.1, 0.5, 0.9)
 
-# Ambiguity half-widths: probability ± around each farm's own p_hat.
-# hw=0.3 → [p-0.3, p+0.3] (high ambiguity), hw=0.2 → medium, hw=0.1 → low
-amb_halfwidths <- c(0.3, 0.2, 0.1)
+# Ambiguity (epsilon-contamination)
+amb_radii <- c(0.3, 0.2, 0.1)
 
 # Broad framing reference points: per-farm mean profit under no contract (status quo)
 ref_broad_farms <- colMeans(broad_mats[["nc"]])
@@ -1677,10 +1873,10 @@ ref_broad_farms <- colMeans(broad_mats[["nc"]])
 ref_narrow_farms <- rep(0, n_farms)
 
 # reference point for alpha-EU
-# uncomment row for sensitivity analysis of reference point choice
 ref_broad_aeu <- colMeans(broad_mats[["nc"]])
-#ref_broad_aeu <- apply(broad_mats[["nc"]], 2, quantile, probs = 0.4)
-#ref_broad_aeu <- apply(broad_mats[["nc"]], 2, quantile, probs = 0.3)
+# alternative reference points for sensitivity analysis
+ref_broad_aeu_04 <- apply(broad_mats[["nc"]], 2, quantile, probs = 0.4)
+ref_broad_aeu_03 <- apply(broad_mats[["nc"]], 2, quantile, probs = 0.3)
 
 # ------------------------------------------------------------------------------
 ## 5.0.4 Compute EUT  ----------------------------------------------------------
@@ -1814,7 +2010,7 @@ compute_alpha_eu_multifarm <- function(
   ref_vecs,
   delta_values,
   alpha_values,
-  amb_halfwidths,
+  amb_radii,
   N_farms,
   n_farms
 ) {
@@ -1848,12 +2044,13 @@ compute_alpha_eu_multifarm <- function(
       p_hat_all <- n_low / Ns_obs # vector length n_farms
 
       for (a in alpha_values) {
-        for (hw in amb_halfwidths) {
-          # Farm-specific ambiguity interval: p_hat[f] ± hw, clipped to [0,1].
-          # hw is a probability half-width (not a quantile index), representing
-          # the agent's subjective uncertainty about the true loss probability.
-          p_min_vec <- pmax(0, p_hat_all - hw)
-          p_max_vec <- pmin(1, p_hat_all + hw)
+        for (eps in amb_radii) {
+          # Farm-specific ambiguity (belief) set, epsilon-contamination style:
+          # P = [p_hat - eps, p_hat + eps], clipped to [0,1]. The interval
+          # narrows once p_hat is within eps of a boundary (see methods
+          # write-up for the economic justification of this shrinkage).
+          p_min_vec <- pmax(0, p_hat_all - eps)
+          p_max_vec <- pmin(1, p_hat_all + eps)
           ce_vec <- numeric(n_farms)
 
           for (f in 1:n_farms) {
@@ -1872,7 +2069,7 @@ compute_alpha_eu_multifarm <- function(
             }
           }
 
-          p_label <- paste0("hw=", hw)
+          p_label <- paste0("ε=", eps)
           idx <- idx + 1L
           results[[idx]] <- data.frame(
             Variable = s,
@@ -1903,29 +2100,11 @@ eut_broad_all <- compute_eut_vectorized(
   n_farms
 )
 
-# EUT braod framing with alternative delta values for sensitivity analysis
-eut_broad_alt <- compute_eut_vectorized(
-  broad_mats,
-  broad_names,
-  delta_alt,
-  N_farms,
-  n_farms
-)
-
 # EUT narrow framing
 eut_narrow_all <- compute_eut_vectorized(
   narrow_mats,
   narrow_names,
   delta_nf,
-  N_farms,
-  n_farms
-)
-
-# EUT narrow framing with alternative delta values for sensitivity analysis
-eut_narrow_alt <- compute_eut_vectorized(
-  narrow_mats,
-  narrow_names,
-  delta_alt,
   N_farms,
   n_farms
 )
@@ -1942,17 +2121,6 @@ cpt_broad_all <- compute_cpt_multifarm(
   n_farms
 )
 
-alphaeu_broad_all <- compute_alpha_eu_multifarm(
-  broad_mats,
-  broad_names,
-  ref_broad_aeu,
-  delta_bf,
-  alpha_amb,
-  amb_halfwidths,
-  N_farms,
-  n_farms
-)
-
 cpt_narrow_all <- compute_cpt_multifarm(
   narrow_mats,
   narrow_names,
@@ -1964,13 +2132,50 @@ cpt_narrow_all <- compute_cpt_multifarm(
   n_farms
 )
 
+alphaeu_broad_all <- compute_alpha_eu_multifarm(
+  broad_mats,
+  broad_names,
+  ref_broad_aeu,
+  delta_bf,
+  alpha_amb,
+  amb_radii,
+  N_farms,
+  n_farms
+)
+
+# alternative alphaEU with different reference point
+
+# 40th qunatile
+alphaeu_broad_all_04 <- compute_alpha_eu_multifarm(
+  broad_mats,
+  broad_names,
+  ref_broad_aeu_04,
+  delta_bf,
+  alpha_amb,
+  amb_radii,
+  N_farms,
+  n_farms
+)
+
+# 30th qunatile
+alphaeu_broad_all_03 <- compute_alpha_eu_multifarm(
+  broad_mats,
+  broad_names,
+  ref_broad_aeu_03,
+  delta_bf,
+  alpha_amb,
+  amb_radii,
+  N_farms,
+  n_farms
+)
+
 alphaeu_narrow_all <- compute_alpha_eu_multifarm(
   narrow_mats,
   narrow_names,
   ref_narrow_farms,
   delta_nf,
   alpha_amb,
-  amb_halfwidths,
+  amb_radii,
   N_farms,
   n_farms
 )
@@ -1995,15 +2200,6 @@ eut_broad_summary <- eut_broad_all |>
   ) |>
   mutate(across(where(is.numeric) & !any_of("Delta"), ~ round(., 2)))
 
-# alternative deltas
-eut_broad_summary_alt <- eut_broad_alt |>
-  group_by(Delta, Variable) |>
-  summarise(
-    mean_CE = mean(CertaintyEquivalent),
-    .groups = "drop"
-  ) |>
-  mutate(across(where(is.numeric) & !any_of("Delta"), ~ round(., 2)))
-
 cpt_broad_summary <- cpt_broad_all |>
   group_by(Alpha, Lambda, Gamma, Variable) |>
   summarise(
@@ -2016,7 +2212,10 @@ cpt_broad_summary <- cpt_broad_all |>
     q95_CPT = quantile(CPT_Value, 0.95),
     .groups = "drop"
   ) |>
-  mutate(across(where(is.numeric), ~ round(., 2)))
+  mutate(across(
+    where(is.numeric) & !any_of(c("Alpha", "Lambda", "Gamma")),
+    ~ round(., 2)
+  ))
 
 alphaeu_broad_summary <- alphaeu_broad_all |>
   group_by(Delta, Alpha, P_interval, Variable) |>
@@ -2031,6 +2230,23 @@ alphaeu_broad_summary <- alphaeu_broad_all |>
     .groups = "drop"
   ) |>
   mutate(across(where(is.numeric) & !any_of("Delta"), ~ round(., 2)))
+
+alphaeu_broad_summary_04 <- alphaeu_broad_all_04 |>
+  group_by(Delta, Alpha, P_interval, Variable) |>
+  summarise(
+    mean_CE = mean(AlphaEU_CE),
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric) & !any_of("Delta"), ~ round(., 2)))
+
+alphaeu_broad_summary_03 <- alphaeu_broad_all_03 |>
+  group_by(Delta, Alpha, P_interval, Variable) |>
+  summarise(
+    mean_CE = mean(AlphaEU_CE),
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric) & !any_of("Delta"), ~ round(., 2)))
+
 
 eut_narrow_summary <- eut_narrow_all |>
   group_by(Delta, Variable) |>
@@ -2047,14 +2263,6 @@ eut_narrow_summary <- eut_narrow_all |>
   ) |>
   mutate(across(where(is.numeric) & !any_of("Delta"), ~ round(., 2)))
 
-eut_narrow_summary_alt <- eut_narrow_alt |>
-  group_by(Delta, Variable) |>
-  summarise(
-    mean_CE = mean(CertaintyEquivalent),
-    .groups = "drop"
-  ) |>
-  mutate(across(where(is.numeric) & !any_of("Delta"), ~ round(., 2)))
-
 cpt_narrow_summary <- cpt_narrow_all |>
   group_by(Alpha, Lambda, Gamma, Variable) |>
   summarise(
@@ -2067,7 +2275,10 @@ cpt_narrow_summary <- cpt_narrow_all |>
     q95_CPT = quantile(CPT_Value, 0.95),
     .groups = "drop"
   ) |>
-  mutate(across(where(is.numeric), ~ round(., 2)))
+  mutate(across(
+    where(is.numeric) & !any_of(c("Alpha", "Lambda", "Gamma")),
+    ~ round(., 2)
+  ))
 
 alphaeu_narrow_summary <- alphaeu_narrow_all |>
   group_by(Delta, Alpha, P_interval, Variable) |>
@@ -2083,198 +2294,106 @@ alphaeu_narrow_summary <- alphaeu_narrow_all |>
   ) |>
   mutate(across(where(is.numeric) & !any_of("Delta"), ~ round(., 2)))
 
-# -------------------------------------------------------------------------------
-## 5.3 Save outputs --------------------------------------------------------------
-# -------------------------------------------------------------------------------
-
-if (SAVE_OUTPUTS) {
-  write_csv(eut_broad_summary, "3_Outputs/Table_MultiFarm_EUT_BroadFraming.csv")
-  write_csv(cpt_broad_summary, "3_Outputs/Table_MultiFarm_CPT_BroadFraming.csv")
-  write_csv(
-    alphaeu_broad_summary,
-    "3_Outputs/Table_MultiFarm_AlphaEU_BroadFraming.csv"
-  )
-  write_csv(
-    eut_narrow_summary,
-    "3_Outputs/Table_MultiFarm_EUT_NarrowFraming.csv"
-  )
-  write_csv(
-    cpt_narrow_summary,
-    "3_Outputs/Table_MultiFarm_CPT_NarrowFraming.csv"
-  )
-  write_csv(
-    alphaeu_narrow_summary,
-    "3_Outputs/Table_MultiFarm_AlphaEU_NarrowFraming.csv"
-  )
-}
-
-# -------------------------------------------------------------------------------
-## 5.4 Distribution plots -------------------------------------------------------
-# -------------------------------------------------------------------------------
-
-# contract names
-
-# EUT certainty equivalents under broad framing
-plot_eut_broad_dist <- eut_broad_all |>
-  filter(Delta == delta_bf[3]) |>
-  ggplot(aes(x = CertaintyEquivalent, y = Variable)) +
-  geom_density_ridges(alpha = 0.4) +
-  labs(
-    title = "EUT",
-    x = NULL,
-    y = NULL
-  ) +
-  theme_minimal()
-
-
-# CPT values under broad framing — standard assumptions
-plot_cpt_broad_dist <- cpt_broad_all |>
-  filter(Alpha == 0.334, Lambda == 1.574, Gamma == 0.571) |>
-  ggplot(aes(x = CPT_Value, y = Variable)) +
-  geom_density_ridges(alpha = 0.4) +
-  labs(
-    title = "CPT",
-    x = NULL,
-    y = NULL
-  ) +
-  theme_minimal()
-
-# EUT certainty equivalents under narrow framing
-plot_eut_narrow_dist <- eut_narrow_all |>
-  filter(Delta == delta_nf[3]) |>
-  ggplot(aes(x = CertaintyEquivalent, y = Variable)) +
-  geom_density_ridges(alpha = 0.4) +
-  labs(
-    x = NULL,
-    y = NULL
-  ) +
-  theme_minimal()
-
-
-# CPT values under narrow framing — standard assumptions
-plot_cpt_narrow_dist <- cpt_narrow_all |>
-  filter(Alpha == 0.334, Lambda == 1.574, Gamma == 0.571) |>
-  ggplot(aes(x = CPT_Value, y = Variable)) +
-  geom_density_ridges(alpha = 0.4) +
-  labs(
-    x = NULL,
-    y = NULL
-  ) +
-  theme_minimal()
-
-
-# Alpha-EU certainty equivalents under broad framing
-plot_alphaeu_broad_dist <- alphaeu_broad_all |>
-  filter(Delta == delta_bf[3], Alpha == 0.9, P_interval == "hw=0.2") |>
-  ggplot(aes(x = AlphaEU_CE, y = Variable)) +
-  geom_density_ridges(alpha = 0.4) +
-  labs(
-    title = "Alpha-EU",
-    x = NULL,
-    y = NULL
-  ) +
-  theme_minimal()
-
-
-# Alpha-EU certainty equivalents under narrow framing
-plot_alphaeu_narrow_dist <- alphaeu_narrow_all |>
-  filter(Delta == delta_nf[3], Alpha == 0.9, P_interval == "hw=0.2") |>
-  ggplot(aes(x = AlphaEU_CE, y = Variable)) +
-  geom_density_ridges(alpha = 0.4) +
-  labs(
-    x = NULL,
-    y = NULL
-  ) +
-  theme_minimal()
-
-utility_plots <- ((plot_eut_broad_dist + labs(y = "Broad Framing\n")) +
-  plot_cpt_broad_dist +
-  plot_alphaeu_broad_dist) /
-  ((plot_eut_narrow_dist + labs(y = "Narrow Framing\n")) +
-    plot_cpt_narrow_dist +
-    plot_alphaeu_narrow_dist)
-
-utility_plots
-
-if (SAVE_OUTPUTS) {
-  ggsave(
-    "3_Outputs/Fig_UtilityPlots.pdf",
-    plot = utility_plots,
-    width = 14,
-    height = 10
-  )
-}
 
 # ==============================================================================
-# 5.4b SENSITIVITY ANALYSIS PLOTS ==============================================
+# 5.4 PLOTS ====================================================================
 # ==============================================================================
 
-# parameters for consistency
-xlim_eut_broad <- c(
-  min(min(eut_broad_summary$mean_CE), min(eut_broad_summary_alt$mean_CE)),
-  max(max(eut_broad_summary$mean_CE), max(eut_broad_summary_alt$mean_CE))
-)
-xlim_eut_narrow <- c(-90, 50)
-xlim_cpt_broad <- c(-10, 10)
-xlim_cpt_narrow <- c(-10, 10)
-xlim_alphaeu_broad <- c(800, 1200)
-xlim_alphaeu_narrow <- c(-200, 100)
-
+delta_labels <- c(".0005", ".001", ".002", ".003", ".004")
+delta_greens <- RColorBrewer::brewer.pal(7, "Greens")[2:6]
+greens <- RColorBrewer::brewer.pal(7, "Greens")[c(2, 4, 6)]
 
 # EUT — broad framing
 plot_eut_broad_sens <- eut_broad_summary |>
   mutate(Delta = factor(Delta)) |>
+  relabel_scenarios() |>
   ggplot(aes(x = mean_CE, y = Variable, color = Delta)) +
   geom_point() +
-  coord_cartesian(xlim = xlim_eut_broad) +
-  labs(title = "EUT - Broad Framing", x = NULL, y = NULL) +
-  scale_colour_brewer(palette = "Blues", direction = 1) +
-  theme_minimal()
-
-# alternative deltas
-plot_eut_broad_sens_alt <- eut_broad_summary_alt |>
-  mutate(Delta = factor(Delta)) |>
-  ggplot(aes(x = mean_CE, y = Variable, color = Delta)) +
-  geom_point() +
-  coord_cartesian(xlim = xlim_eut_broad) +
-  labs(x = "Mean CE (€)", y = NULL) +
-  scale_colour_brewer(palette = "Greens", direction = 1) +
-  theme_minimal()
+  labs(title = "EUT - Broad Framing", x = "\nCE (€)", y = NULL, colour = "δ") +
+  scale_colour_manual(values = delta_greens, labels = delta_labels) +
+  scale_y_discrete(drop = FALSE) +
+  theme_minimal(base_size = 12)
 
 # EUT — narrow framing
 plot_eut_narrow_sens <- eut_narrow_summary |>
   mutate(Delta = factor(Delta)) |>
+  relabel_scenarios() |>
   ggplot(aes(x = mean_CE, y = Variable, color = Delta)) +
   geom_point() +
-  coord_cartesian(xlim = xlim_eut_narrow) +
-  labs(title = "EUT - Narrow Framing", x = NULL, y = NULL) +
-  scale_colour_brewer(palette = "Blues", direction = 1) +
-  theme_minimal()
+  labs(title = "EUT - Narrow Framing", x = "\nCE (€)", y = NULL, colour = "δ") +
+  scale_colour_manual(values = delta_greens, labels = delta_labels) +
+  scale_y_discrete(drop = FALSE) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
 
-# alternative deltas
-plot_eut_narrow_sens_alt <- eut_narrow_summary_alt |>
-  mutate(Delta = factor(Delta)) |>
-  ggplot(aes(x = mean_CE, y = Variable, color = Delta)) +
-  geom_point() +
-  coord_cartesian(xlim = xlim_eut_narrow) +
-  labs(x = "Mean CE (€)", y = NULL) +
-  scale_colour_brewer(palette = "Greens", direction = 1) +
-  theme_minimal()
+eut_result_plots <- ((plot_eut_broad_sens + theme(legend.position = "left")) +
+  (plot_eut_narrow_sens + theme(legend.position = "none")))
 
-eut_sens_plots <- ((plot_eut_broad_sens + theme(legend.position = "left")) +
-  (plot_eut_narrow_sens + theme(legend.position = "none"))) /
-  ((plot_eut_broad_sens_alt + theme(legend.position = "left")) +
-    (plot_eut_narrow_sens_alt + theme(legend.position = "none")))
-
-eut_sens_plots
+eut_result_plots
 
 # save outputs
 if (SAVE_OUTPUTS) {
   ggsave(
-    "3_Outputs/Fig_EUT_Sensitivity.pdf",
-    plot = eut_sens_plots,
-    width = 14,
-    height = 10
+    op("3_Outputs/Fig_EUT_Results.pdf"),
+    plot = eut_result_plots,
+    width = 10,
+    height = 8,
+    device = cairo_pdf
+  )
+}
+
+## CPT results and sensitivity plots ###########################################
+
+# CPT — broad framing: standard Alpha & Gamma, colour by loss aversion (Lambda)
+plot_cpt_broad_single <- cpt_broad_summary |>
+  filter(Alpha == 0.334, Gamma == 0.571) |>
+  mutate(Lambda = factor(Lambda)) |>
+  relabel_scenarios() |>
+  ggplot(aes(x = mean_CPT, y = Variable, colour = Lambda)) +
+  geom_point() +
+  labs(
+    title = "CPT - Broad Framing",
+    x = "\nMean CPT Value",
+    y = NULL,
+    colour = "λ"
+  ) +
+  scale_colour_manual(values = greens) +
+  scale_y_discrete(drop = FALSE) +
+  theme_minimal()
+
+# CPT — narrow framing: standard Alpha & Gamma, colour by loss aversion (Lambda)
+plot_cpt_narrow_single <- cpt_narrow_summary |>
+  filter(Alpha == 0.334, Gamma == 0.571) |>
+  mutate(Lambda = factor(Lambda)) |>
+  relabel_scenarios() |>
+  ggplot(aes(x = mean_CPT, y = Variable, colour = Lambda)) +
+  geom_point() +
+  labs(
+    title = "CPT - Narrow Framing",
+    x = "\nMean CPT Value",
+    y = NULL,
+    colour = "λ"
+  ) +
+  scale_colour_manual(values = greens) +
+  scale_y_discrete(drop = FALSE) +
+  theme_minimal() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+cpt_result_plots <- (plot_cpt_broad_single + theme(legend.position = "left")) +
+  (plot_cpt_narrow_single + theme(legend.position = "none"))
+
+cpt_result_plots
+
+if (SAVE_OUTPUTS) {
+  ggsave(
+    op("3_Outputs/Fig_CPT_Results.pdf"),
+    plot = cpt_result_plots,
+    width = 10,
+    height = 8,
+    device = cairo_pdf
   )
 }
 
@@ -2285,8 +2404,9 @@ plot_cpt_broad_sens <- cpt_broad_summary |>
     Lambda = factor(Lambda),
     Gamma = factor(Gamma)
   ) |>
+  relabel_scenarios() |>
   ggplot(aes(x = mean_CPT, y = Variable, colour = Alpha, group = Alpha)) +
-  geom_point(position = position_dodge(width = 0.6)) +
+  geom_point() +
   facet_grid(Lambda ~ Gamma, labeller = label_both) +
   labs(
     title = "CPT - Broad Framing",
@@ -2294,7 +2414,7 @@ plot_cpt_broad_sens <- cpt_broad_summary |>
     y = NULL,
     colour = "α"
   ) +
-  theme_minimal()
+  theme_minimal(base_size = 12)
 
 # CPT — narrow framing
 plot_cpt_narrow_sens <- cpt_narrow_summary |>
@@ -2303,8 +2423,9 @@ plot_cpt_narrow_sens <- cpt_narrow_summary |>
     Lambda = factor(Lambda),
     Gamma = factor(Gamma)
   ) |>
+  relabel_scenarios() |>
   ggplot(aes(x = mean_CPT, y = Variable, colour = Alpha, group = Alpha)) +
-  geom_point(position = position_dodge(width = 0.6)) +
+  geom_point() +
   facet_grid(Lambda ~ Gamma, labeller = label_both) +
   labs(
     title = "CPT - Narrow Framing",
@@ -2312,201 +2433,189 @@ plot_cpt_narrow_sens <- cpt_narrow_summary |>
     y = NULL,
     colour = "α"
   ) +
+  theme_minimal(base_size = 12)
+
+plot_cpt_broad_sens
+plot_cpt_narrow_sens
+
+if (SAVE_OUTPUTS) {
+  ggsave(
+    op("3_Outputs/Fig_CPT_Broad_Sensitivity.pdf"),
+    plot = plot_cpt_broad_sens,
+    width = 8,
+    height = 10,
+    device = cairo_pdf
+  )
+  ggsave(
+    op("3_Outputs/Fig_CPT_Narrow_Sensitivity.pdf"),
+    plot = plot_cpt_narrow_sens,
+    width = 8,
+    height = 10,
+    device = cairo_pdf
+  )
+}
+
+## Alpha-EU results and sensitivity plots ######################################
+
+# Alpha-EU — broad framing: standard ambiguity aversion & risk aversion, colour by ambiguity interval
+plot_alphaeu_broad_single <- alphaeu_broad_summary |>
+  filter(Alpha == 0.9, Delta == delta_bf[3]) |>
+  mutate(P_interval = factor(P_interval)) |>
+  relabel_scenarios() |>
+  ggplot(aes(x = mean_CE, y = Variable, colour = P_interval)) +
+  geom_point() +
+  labs(
+    title = "Alpha-EU - Broad Framing",
+    x = "\nMean CE (€)",
+    y = NULL,
+    colour = "ε"
+  ) +
+  scale_colour_manual(
+    values = greens,
+    labels = c("ε=0.1" = "0.1", "ε=0.2" = "0.2", "ε=0.3" = "0.3")
+  ) +
+  scale_y_discrete(drop = FALSE) +
   theme_minimal()
+
+# Alpha-EU — narrow framing: standard ambiguity aversion & risk aversion, colour by ambiguity interval
+plot_alphaeu_narrow_single <- alphaeu_narrow_summary |>
+  filter(Alpha == 0.9, Delta == delta_nf[3]) |>
+  mutate(P_interval = factor(P_interval)) |>
+  relabel_scenarios() |>
+  ggplot(aes(x = mean_CE, y = Variable, colour = P_interval)) +
+  geom_point() +
+  labs(
+    title = "Alpha-EU - Narrow Framing",
+    x = "\nMean CE (€)",
+    y = NULL,
+    colour = "ε"
+  ) +
+  scale_colour_manual(
+    values = greens,
+    labels = c("ε=0.1" = "0.1", "ε=0.2" = "0.2", "ε=0.3" = "0.3")
+  ) +
+  scale_y_discrete(drop = FALSE) +
+  theme_minimal() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+alphaeu_result_plots <- (plot_alphaeu_broad_single +
+  theme(legend.position = "left")) +
+  (plot_alphaeu_narrow_single + theme(legend.position = "none"))
+
+alphaeu_result_plots
+
+if (SAVE_OUTPUTS) {
+  ggsave(
+    op("3_Outputs/Fig_AlphaEU_Results.pdf"),
+    plot = alphaeu_result_plots,
+    width = 10,
+    height = 8,
+    device = cairo_pdf
+  )
+}
 
 # Alpha-EU — broad framing: facet_grid(Alpha ~ P_interval), colour by Delta
 plot_alphaeu_broad_sens <- alphaeu_broad_summary |>
   mutate(Alpha = factor(Alpha), Delta = factor(Delta)) |>
+  relabel_scenarios() |>
   ggplot(aes(x = mean_CE, y = Variable, colour = Delta, group = Delta)) +
-  geom_point(position = position_dodge(width = 0.6)) +
+  geom_point() +
   facet_grid(Alpha ~ P_interval, labeller = label_both) +
-  scale_colour_brewer(palette = "Blues", direction = 1) +
+  scale_colour_manual(values = delta_greens, labels = delta_labels) +
   labs(
     title = "Alpha-EU - Broad Framing",
+    subtitle = "Reference point: farm mean profit/ha under no contract",
     x = "Mean CE (€)",
     y = NULL,
     colour = "δ"
   ) +
-  coord_cartesian(xlim = xlim_alphaeu_broad) +
-  theme_minimal()
+  theme_minimal(base_size = 12)
+
+# sensitivity analysis with alternative reference points
+plot_alphaeu_broad_sens_04 <- alphaeu_broad_summary_04 |>
+  mutate(Alpha = factor(Alpha), Delta = factor(Delta)) |>
+  relabel_scenarios() |>
+  ggplot(aes(x = mean_CE, y = Variable, colour = Delta, group = Delta)) +
+  geom_point() +
+  facet_grid(Alpha ~ P_interval, labeller = label_both) +
+  scale_colour_manual(values = delta_greens, labels = delta_labels) +
+  labs(
+    title = "Alpha-EU - Broad Framing",
+    subtitle = "Reference point: farm 40th percentile profit/ha under no contract",
+    x = "Mean CE (€)",
+    y = NULL,
+    colour = "δ"
+  ) +
+  theme_minimal(base_size = 12)
+
+plot_alphaeu_broad_sens_03 <- alphaeu_broad_summary_03 |>
+  mutate(Alpha = factor(Alpha), Delta = factor(Delta)) |>
+  relabel_scenarios() |>
+  ggplot(aes(x = mean_CE, y = Variable, colour = Delta, group = Delta)) +
+  geom_point() +
+  facet_grid(Alpha ~ P_interval, labeller = label_both) +
+  scale_colour_manual(values = delta_greens, labels = delta_labels) +
+  labs(
+    title = "Alpha-EU - Broad Framing",
+    subtitle = "Reference point: farm 30th percentile profit/ha under no contract",
+    x = "Mean CE (€)",
+    y = NULL,
+    colour = "δ"
+  ) +
+  theme_minimal(base_size = 12)
+
+plot_alphaeu_broad_sens
+plot_alphaeu_broad_sens_04
+plot_alphaeu_broad_sens_03
+
+if (SAVE_OUTPUTS) {
+  ggsave(
+    op("3_Outputs/Fig_AlphaEU_Broad_Sensitivity.pdf"),
+    plot = plot_alphaeu_broad_sens,
+    width = 8,
+    height = 10,
+    device = cairo_pdf
+  )
+  ggsave(
+    op("3_Outputs/Fig_AlphaEU_Broad_Sensitivity_Ref40.pdf"),
+    plot = plot_alphaeu_broad_sens_04,
+    width = 8,
+    height = 10,
+    device = cairo_pdf
+  )
+  ggsave(
+    op("3_Outputs/Fig_AlphaEU_Broad_Sensitivity_Ref30.pdf"),
+    plot = plot_alphaeu_broad_sens_03,
+    width = 8,
+    height = 10,
+    device = cairo_pdf
+  )
+}
 
 # Alpha-EU — narrow framing
 plot_alphaeu_narrow_sens <- alphaeu_narrow_summary |>
   mutate(Alpha = factor(Alpha), Delta = factor(Delta)) |>
+  relabel_scenarios() |>
   ggplot(aes(x = mean_CE, y = Variable, colour = Delta, group = Delta)) +
-  geom_point(position = position_dodge(width = 0.6)) +
+  geom_point() +
   facet_grid(Alpha ~ P_interval, labeller = label_both) +
-  scale_colour_brewer(palette = "Blues", direction = 1) +
+  scale_colour_manual(values = delta_greens, labels = delta_labels) +
   labs(
     title = "Alpha-EU - Narrow Framing",
     x = "Mean CE (€)",
     y = NULL,
     colour = "δ"
   ) +
-  coord_cartesian(xlim = xlim_alphaeu_narrow) +
-  theme_minimal()
+  theme_minimal(base_size = 12)
 
-
-# ==============================================================================
-# 5.5 FORMAL STATISTICAL TESTS =================================================
-# ==============================================================================
-
-# One representative parameter slice per model used throughout this section.
-DELTA_EUT_B <- delta_bf[3]
-DELTA_AEU_B <- delta_bf[3]
-ALPHA_AEU <- 0.5
-P_AEU <- "hw=0.3"
-
-
-# -------------------------------------------------------------------------------
-## paired Wilcoxon signed-rank (each contract vs "nc") ----
-# -------------------------------------------------------------------------------
-
-nc_eut <- eut_broad_all |>
-  filter(Variable == "nc", Delta == DELTA_EUT_B) |>
-  arrange(farm_id) |>
-  pull(CertaintyEquivalent)
-
-nc_aeu <- alphaeu_broad_all |>
-  filter(
-    Variable == "nc",
-    Delta == DELTA_AEU_B,
-    Alpha == ALPHA_AEU,
-    P_interval == P_AEU
-  ) |>
-  arrange(farm_id) |>
-  pull(AlphaEU_CE)
-
-wilcox_broad <- map_dfr(setdiff(broad_names, "nc"), function(s) {
-  eut_ce <- eut_broad_all |>
-    filter(Variable == s, Delta == DELTA_EUT_B) |>
-    arrange(farm_id) |>
-    pull(CertaintyEquivalent)
-  aeu_ce <- alphaeu_broad_all |>
-    filter(
-      Variable == s,
-      Delta == DELTA_AEU_B,
-      Alpha == ALPHA_AEU,
-      P_interval == P_AEU
-    ) |>
-    arrange(farm_id) |>
-    pull(AlphaEU_CE)
-
-  te <- wilcox.test(eut_ce, nc_eut, paired = TRUE, alternative = "greater")
-  ta <- wilcox.test(aeu_ce, nc_aeu, paired = TRUE, alternative = "greater")
-
-  tibble(
-    scenario = s,
-    p_EUT = te$p.value,
-    p_AlphaEU = ta$p.value
-  )
-})
-
-wilcox_broad
-
-# -------------------------------------------------------------------------------
-## 5.5.2 Broad framing: paired Wilcoxon: option vs forward baseline -----------
-# -------------------------------------------------------------------------------
-
-# alternative = "two.sided": direction not predetermined EUT agents may prefer
-# forwards (greater variance reduction); behavioural agents may prefer options.
-
-# Forward baselines: one CE vector per farm per model
-fwd_baselines <- list(
-  fc = list(
-    eut = eut_broad_all |>
-      filter(Variable == "f_fc", Delta == DELTA_EUT_B) |>
-      arrange(farm_id) |>
-      pull(CertaintyEquivalent),
-    aeu = alphaeu_broad_all |>
-      filter(
-        Variable == "f_fc",
-        Delta == DELTA_AEU_B,
-        Alpha == ALPHA_AEU,
-        P_interval == P_AEU
-      ) |>
-      arrange(farm_id) |>
-      pull(AlphaEU_CE)
-  ),
-  wc = list(
-    eut = eut_broad_all |>
-      filter(Variable == "w_fc", Delta == DELTA_EUT_B) |>
-      arrange(farm_id) |>
-      pull(CertaintyEquivalent),
-    aeu = alphaeu_broad_all |>
-      filter(
-        Variable == "w_fc",
-        Delta == DELTA_AEU_B,
-        Alpha == ALPHA_AEU,
-        P_interval == P_AEU
-      ) |>
-      arrange(farm_id) |>
-      pull(AlphaEU_CE)
-  ),
-  both = list(
-    eut = eut_broad_all |>
-      filter(Variable == "both_fc", Delta == DELTA_EUT_B) |>
-      arrange(farm_id) |>
-      pull(CertaintyEquivalent),
-    aeu = alphaeu_broad_all |>
-      filter(
-        Variable == "both_fc",
-        Delta == DELTA_AEU_B,
-        Alpha == ALPHA_AEU,
-        P_interval == P_AEU
-      ) |>
-      arrange(farm_id) |>
-      pull(AlphaEU_CE)
-  )
-)
-
-wilcox_vs_fwd <- map_dfr(c("fc", "wc", "both"), function(prefix) {
-  map_dfr(1:5, function(i) {
-    s <- paste0(prefix, "_", i)
-
-    eut_ce <- eut_broad_all |>
-      filter(Variable == s, Delta == DELTA_EUT_B) |>
-      arrange(farm_id) |>
-      pull(CertaintyEquivalent)
-    aeu_ce <- alphaeu_broad_all |>
-      filter(
-        Variable == s,
-        Delta == DELTA_AEU_B,
-        Alpha == ALPHA_AEU,
-        P_interval == P_AEU
-      ) |>
-      arrange(farm_id) |>
-      pull(AlphaEU_CE)
-
-    te <- wilcox.test(
-      eut_ce,
-      fwd_baselines[[prefix]]$eut,
-      paired = TRUE,
-      alternative = "greater"
-    )
-    ta <- wilcox.test(
-      aeu_ce,
-      fwd_baselines[[prefix]]$aeu,
-      paired = TRUE,
-      alternative = "greater"
-    )
-
-    tibble(
-      scenario = s,
-      p_EUT = te$p.value,
-      p_AlphaEU = ta$p.value
-    )
-  })
-})
-
-wilcox_vs_fwd
-
-
-# -------------------------------------------------------------------------------
-## 5.5.5 Save test results -------------------------------------------------------
-# -------------------------------------------------------------------------------
+plot_alphaeu_narrow_sens
 
 if (SAVE_OUTPUTS) {
-  write_csv(wilcox_broad, "3_Outputs/Table_WilcoxBroad.csv")
-  write_csv(wilcox_vs_fwd, "3_Outputs/Table_WilcoxVsForward.csv")
+  ggsave(
+    op("3_Outputs/Fig_AlphaEU_Narrow_Sensitivity.pdf"),
+    plot = plot_alphaeu_narrow_sens,
+    width = 8,
+    height = 10,
+    device = cairo_pdf
+  )
 }

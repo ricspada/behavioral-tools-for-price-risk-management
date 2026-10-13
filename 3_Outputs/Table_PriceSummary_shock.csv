@@ -1,0 +1,5 @@
+series,commodity,mean,median,sd,min,max,skewness
+Historical,CAN,306.25,276,143.97,162.5,929,2.52
+Simulated,CAN,339.51,302.51,124.74,158.23,1869.94,3.22
+Historical,Wheat,182.7,175,50.93,93.5,380,1.25
+Simulated,Wheat,191.06,180.07,45.11,95.7,571,1.73
