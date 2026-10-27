@@ -1320,8 +1320,8 @@ simulated_years <- Nt / obs_per_year
 # exercise in early march
 exercise_time <- 11 + (0:(simulated_years - 1)) * obs_per_year
 int <- 0.02 # Interest rate (Euro Short-Term Rate at time of analysis)
-T_years <- 0.5 # time to maturity (6 months)
-discount_factor <- 1 / (1 + int)^T_years
+T_years <- 5 / 12 # time to maturity (5 months)
+discount_factor <- exp(-int * T_years)
 
 # get simulated fertilizer prices
 sim_f_p <- array(dim = c(Ns, simulated_years))
@@ -1378,10 +1378,8 @@ premium_results <- data.frame(
 ## 4.2 Output Contract Pricing based on simulated wheat prices -----------------
 #-------------------------------------------------------------------------------
 
-# Wheat is sold at t=13 (early July), approximately 12 months from the autumn
-# reference at which contracts are initiated. The put option matures at delivery.
-T_years_w <- 1.0
-discount_factor_w <- 1 / (1 + int)^T_years_w
+T_years_w <- 10 / 12 # time to maturity (10 months)
+discount_factor_w <- exp(-int * T_years_w)
 
 # Strike prices: lower quantiles provide downside (floor) protection on revenue.
 # Symmetric to the fertilizer call's 0.5-0.9 range: same 40-pct span, lower tail.
