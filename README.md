@@ -1,22 +1,8 @@
 # Behavioural contracts for farmers' nitrogen and wheat price risk management: Evaluation under different decision theories and framings
 
-Data and R code for:
+Data and R code for the article:
 
 Behavioural contracts for farmers' nitrogen and wheat price risk management: Evaluation under different decision theories and framings. Submitted to *European Review of Agricultural Economics*.
-
-**Authors**
-
-Riccardo Spada<sup>1</sup> (corresponding author), Lucas Åkerman<sup>2</sup>, Simone Cerroni<sup>3,4</sup>, Miranda P.M. Meuwissen<sup>1</sup>, Laura Moritz<sup>3</sup>, Jens Rommel<sup>2</sup>, Rastislav Skalský<sup>5</sup>, Tobias Dalhaus<sup>1,6</sup>
-
-<sup>1</sup> Business Economics Group, Wageningen University & Research, Wageningen, Netherlands\
-<sup>2</sup> Department of Economics, Swedish University of Agricultural Sciences (SLU), Uppsala, Sweden\
-<sup>3</sup> Center Agriculture Food Environment (C3A), University of Trento, Trento, Italy\
-<sup>4</sup> Department of Economics and Management, University of Trento, Trento, Italy\
-<sup>5</sup> Biodiversity and Natural Resources Program (BNR), International Institute for Applied Systems Analysis (IIASA), Laxenburg, Austria\
-<sup>6</sup> Agribusiness, Sustainable Food Systems Research Centre, Rhine-Waal University of Applied Sciences, Kleve, Germany
-
-**Funding:** European Commission, grant agreement 101136474 (AgEnRes project).
-
 
 ## Project Structure
 
